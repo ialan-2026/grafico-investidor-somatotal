@@ -344,7 +344,7 @@ with c_filtro1:
 if tipo_filtro == "Filtrar por Ano":
     with c_filtro2:
         ano_selecionado = st.selectbox("Escolha o Ano de Auditoria", sorted(df_completo["Ano"].unique()))
-        df = df_completo[df_completo["Ano"] == _].copy() if not 'ano_selecionado' in locals() else df_completo[df_completo["Ano"] == ano_selecionado].copy()
+        df = df_completo[df_completo["Ano"] == ano_selecionado].copy()
 else:
     df = df_completo.copy()
 
@@ -352,11 +352,19 @@ retorno_solar_total = df["Valor Total Negócio"].iloc[-1]
 caixa_final_exibido = df["Caixa Acumulado"].iloc[-1]
 saque_final_exibido = df["Saque Acumulado"].iloc[-1] if tipo_filtro == "Histórico Completo" else df["Saque Mensal"].sum()
 
-# --- ARQUITETURA DE ABAS PROFISSIONAIS (UX REVOLUTION) ---
+# --- ARQUITETURA DE ABAS PROFISSIONAIS ---
 tab_financeira, tab_geracao = st.tabs(["📊 PROJEÇÃO FINANCEIRA & HOLDING", "⚡ ENERGIA GERADA & TELEMETRIA"])
 
+# Configurações de Design Reutilizáveis dos Gráficos (TradingView)
+layout_charts = dict(
+    paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#787b86', size=10),
+    xaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False),
+    yaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False),
+    margin=dict(l=45, r=15, t=15, b=25), hovermode='x unified'
+)
+
 # ==============================================================================
-# ABA 1: MODELAGEM FINANCEIRA TRADICIONAL
+# ABA 1: MODELAGEM FINANCEIRA
 # ==============================================================================
 with tab_financeira:
     with st.container():
@@ -371,12 +379,6 @@ with tab_financeira:
     st.markdown("<br>", unsafe_allow_html=True)
     
     row2_col1, row2_col2 = st.columns(2)
-    layout_charts = dict(
-        paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#787b86', size=10),
-        xaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False),
-        yaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False),
-        margin=dict(l=45, r=15, t=15, b=25), hovermode='x unified'
-    )
 
     with row2_col1:
         st.markdown("""<div class="panel-title-bar">📈 ESCALA PATRIMONIAL (ATIVOS VS LIQUIDEZ)</div>""", unsafe_allow_html=True)
@@ -406,7 +408,7 @@ with tab_financeira:
         retorno_cdi_final = val_aporte * ((1 + 0.095) ** anos_totais)
         retorno_imovel_final = val_aporte * ((1 + 0.08) ** anos_totais)
         fig3 = go.Figure(go.Bar(x=[df_completo["Valor Total Negócio"].iloc[-1], retorno_cdi_final, retorno_imovel_final], y=["Império Solar", "Renda Fixa (CDI)", "Imóvel Físico"], orientation='h', marker_color=['#10B981', '#334155', '#1e293b']))
-        fig3.update_layout(paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#787b86', size=10), xaxis=dict(showgrid=True, gridcolor='#2a2e39'), yaxis=dict(showgrid=False), margin=dict(l=10, r=15, t=15, b=15), height=140)
+        fig3.update_layout(**layout_charts, height=140)
         st.plotly_chart(fig3, use_container_width=True, config={'displayModeBar': False})
 
     with row3_col2:
@@ -418,7 +420,7 @@ with tab_financeira:
     st.dataframe(df.style.format({"Faturamento Bruto": formato_real, "Fat. Sem Reajuste": formato_real, "Parcelas Banco": formato_real, "Lucro Líquido": formato_real, "Saque Mensal": formato_real, "Caixa Acumulado": formato_real, "Patrimônio Usinas": formato_real, "Valor Total Negócio": formato_real}), use_container_width=True, height=200, hide_index=True)
 
 # ==============================================================================
-# ABA 2: NOVA PÁGINA - ENERGIA GERADA & DESEMPENHO TÉCNICO
+# ABA 2: ENERGIA GERADA & DESEMPENHO TÉCNICO
 # ==============================================================================
 with tab_geracao:
     col_t1, col_t2, col_t3 = st.columns(3)
@@ -434,25 +436,24 @@ with tab_geracao:
     
     with row_g1:
         st.markdown("""<div class="panel-title-bar">☀️ CURVA DE INJEÇÃO DIÁRIA ESTIMADA (TEMPO REAL NOVO)</div>""", unsafe_allow_html=True)
-        # Gera uma parábola realista de radiação solar ao longo do dia para brilhar os olhos do investidor
         horas_dia = [f"{h:02d}:00" for h in range(5, 19)]
         eficiencia_solar = [0.0, 0.15, 0.45, 0.78, 0.95, 1.0, 0.98, 0.85, 0.60, 0.35, 0.10, 0.0]
         potencia_curva = [potencia_instantanea_kw * f for f in eficiencia_solar[:len(horas_dia)]]
         
         fig_curva = go.Figure()
         fig_curva.add_trace(go.Scatter(x=horas_dia, y=potencia_curva, name="Injeção Instantânea (kW)", line=dict(color="#FBBF24", width=3), fill='tozeroy', fillcolor='rgba(251, 191, 36, 0.05)'))
-        fig_curva.update_layout(**layout_charts, height=280, yaxis=dict(title="Potência Ativa (kW)"))
+        fig_curva.update_layout(**layout_charts, height=280)
+        fig_curva.update_yaxes(title_text="Potência Ativa (kW)")
         st.plotly_chart(fig_curva, use_container_width=True, config={'displayModeBar': False})
 
     with row_g2:
         st.markdown("""<div class="panel-title-bar">📊 EVOLUÇÃO ANUAL ACUMULADA DA GERAÇÃO (MWh)</div>""", unsafe_allow_html=True)
-        # Cria gráfico de barras agregando a estimativa de MWh entregue ao longo da linha do tempo do filtro
         df_agrupado_ano = df.groupby("Ano")["Faturamento Bruto"].sum().reset_index()
-        # Converte de volta de Reais para MWh estimado para exibição puramente técnica
         df_agrupado_ano["MWh_Estimado"] = (df_agrupado_ano["Faturamento Bruto"] / VALOR_KWH_OCULTO) / 1000
         
         fig_barras = go.Figure(go.Bar(x=df_agrupado_ano["Ano"], y=df_agrupado_ano["MWh_Estimado"], marker_color="#3B82F6", name="Volume Anual"))
-        fig_barras.update_layout(**layout_charts, height=280, yaxis=dict(title="Energia Injetada (MWh)"))
+        fig_barras.update_layout(**layout_charts, height=280)
+        fig_barras.update_yaxes(title_text="Energia Injetada (MWh)")
         st.plotly_chart(fig_barras, use_container_width=True, config={'displayModeBar': False})
         
     st.markdown("""<div style="background-color: #131722; border: 1px solid #2a2e39; padding: 20px; border-radius: 4px; color: #cbd5e1; font-size: 0.85rem; line-height: 1.6;">
