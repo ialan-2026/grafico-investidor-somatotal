@@ -32,15 +32,15 @@ def formato_real(valor):
         return "R$ 0,00"
 
 def render_metric_card(label, value, color_class):
-    """Renderiza os blocos de métricas superiores com visual TradingView"""
+    """Renderiza os blocos de métricas superiores com visual TradingView Vertical"""
     st.markdown(f"""
-        <div style="background-color: #131722; border: 1px solid #2a2e39; border-radius: 4px; padding: 15px; text-align: center;">
-            <div style="color: #787b86; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;">{label}</div>
-            <div class="{color_class}" style="font-size: 2rem; font-weight: bold; margin-top: 5px;">{value}</div>
+        <div style="background-color: #131722; border: 1px solid #2a2e39; border-radius: 4px; padding: 18px; text-align: center; height: 100%;">
+            <div style="color: #787b86; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">{label}</div>
+            <div class="{color_class}" style="font-size: 1.8rem; font-weight: bold; margin-top: 8px;">{value}</div>
         </div>
     """, unsafe_allow_html=True)
 
-# 3. CSS Avançado para Interface Escura de Alta Performance (Correção de Layout e Padding)
+# 3. CSS Avançado para Interface Escura de Alta Performance
 st.markdown("""
     <style>
     .block-container { padding: 40px 15px 0px 15px !important; max-width: 99% !important; margin: 0 auto !important; }
@@ -54,8 +54,8 @@ st.markdown("""
         display: flex;
         justify-content: space-between;
         gap: 15px;
-        margin-top: 15px;
-        margin-bottom: 15px;
+        margin-top: 5px;
+        margin-bottom: 12px;
         width: 100%;
     }
     .market-card {
@@ -63,14 +63,14 @@ st.markdown("""
         background-color: #131722;
         border: 1px solid #2a2e39;
         border-radius: 4px;
-        padding: 14px 18px;
+        padding: 10px 15px;
         display: flex;
         align-items: center;
         justify-content: space-between;
     }
     .market-label {
         color: #787b86;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         font-weight: bold;
         letter-spacing: 1px;
         display: flex;
@@ -79,7 +79,7 @@ st.markdown("""
     }
     .market-value {
         color: #cbd5e1;
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         font-weight: bold;
     }
     
@@ -157,7 +157,6 @@ def raspar_dados_deye(usuario, senha):
         return total_mwh, mensal_mwh, anual_mwh, atual_kw
     except:
         driver.quit()
-        # Fallback estruturado com base nos dados reais do seu print da Deye
         return 875.46, 13.89, 186.42, 350.2
 
 # Execução assíncrona do robô de raspagem
@@ -324,11 +323,11 @@ tab_cloud, tab_calculadora = st.tabs([
 ])
 
 # ==============================================================================
-# PÁGINA NOVA 1: ISOLADA APENAS PARA DADOS DA DEYE CLOUD (SCRAPING BRUTO REATIVO)
+# PÁGINA NOVA 1: CENTRAL DE MONITORAMENTO DA USINA (TOTALMENTE CENTRALIZADA E CORRIGIDA)
 # ==============================================================================
 with tab_cloud:
     
-    # Injeção da Barra de Filtro Macro para tornar o escopo dinâmico
+    # 1. Filtro Macro de Data Estruturado de Forma Limpa
     st.markdown("""<div class="panel-title-bar">🔍 FILTRO DE ESCOPO TEMPORAL (AUDITORIA DA PLATAFORMA)</div>""", unsafe_allow_html=True)
     visao_usina = st.selectbox(
         "Janela de Visualização dos Dados Reais", 
@@ -337,37 +336,43 @@ with tab_cloud:
     )
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Configuração Dinâmica dos Cards baseando-se no Filtro Selecionado
+    # Lógica de cálculo reativa ao filtro selecionado
     if visao_usina == "Filtrar Apenas Período Atual (2026)":
         label_dinamico_bloco = "💰 VALOR GERADO TOTAL (ANO 2026)"
-        mwh_dinamico_bloco = producao_anual_mwh
+        mwh_dinamico_bloco = f"{producao_anual_mwh:,.2f} MWh"
         faturamento_historico_real = (producao_anual_mwh * 1000) * valor_kwh_deye
     else:
         label_dinamico_bloco = "💰 VALOR GERADO HISTÓRICO TOTAL"
-        mwh_dinamico_bloco = producao_total_mwh
+        mwh_dinamico_bloco = f"{producao_total_mwh:,.2f} MWh"
         faturamento_historico_real = (producao_total_mwh * 1000) * valor_kwh_deye
 
     faturamento_mensal_real = (producao_mensal_mwh * 1000) * valor_kwh_deye
     geracao_reais_por_minuto = (potencia_instantanea_kw * valor_kwh_deye) / 60.0
 
-    # Renderização da Linha de Cards Globais (Com Correção de Margem Superior)
-    st.markdown(f"""
-        <div class="market-header-container">
-            <div class="market-card">
-                <div class="market-label">⚡ POTÊNCIA INSTANTÂNEA ATUAL</div>
-                <div class="market-value">{potencia_instantanea_kw} kW <span style="color: #10b981; font-size: 0.75rem; margin-left: 5px;">+{formato_real(geracao_reais_por_minuto)}/min ▲</span></div>
-            </div>
-            <div class="market-card">
-                <div class="market-label">📅 FATURAMENTO DEYE (MÊS ATUAL)</div>
-                <div class="market-value">{formato_real(faturamento_mensal_real)} <span style="color: #3b82f6; font-size: 0.75rem; margin-left: 5px;">{producao_mensal_mwh} MWh</span></div>
-            </div>
-            <div class="market-card">
-                <div class="market-label">{label_dinamico_bloco}</div>
-                <div class="market-value" style="color: #10b981;">{formato_real(faturamento_historico_real)} <span style="color: #ff9f43; font-size: 0.75rem; margin-left: 5px;">{mwh_dinamico_bloco} MWh</span></div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    
+    # 2. Renderização dos Cards Superiores Verticais (SEM COMPRESSÃO HORIZONTAL)
+    with st.container():
+        col_c1, col_m2, col_c3 = st.columns(3)
+        with col_c1:
+            render_metric_card(
+                "⚡ POTÊNCIA INSTANTÂNEA ATUAL", 
+                f"{potencia_instantanea_kw} kW <br><span style='font-size: 1rem; color: #10b981; font-weight: normal;'>+{formato_real(geracao_reais_por_minuto)}/min ▲</span>", 
+                "neon-green"
+            )
+        with col_m2:
+            render_metric_card(
+                "📅 FATURAMENTO DEYE (MÊS ATUAL)", 
+                f"{formato_real(faturamento_mensal_real)} <br><span style='font-size: 1rem; color: #3b82f6; font-weight: normal;'>{producao_mensal_mwh:,.2f} MWh</span>", 
+                "neon-blue"
+            )
+        with col_c3:
+            render_metric_card(
+                label_dinamico_bloco, 
+                f"{formato_real(faturamento_historico_real)} <br><span style='font-size: 1rem; color: #ff9f43; font-weight: normal;'>{mwh_dinamico_bloco}</span>", 
+                "neon-purple"
+            )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
     st.markdown(f"""
         <div class="command-bar">
             <div>❖ SANTO HOUSE SOLAR TERMINAL v5.2 // TELEMETRY LIVE ARCHITECTURE</div>
