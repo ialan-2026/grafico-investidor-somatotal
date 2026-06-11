@@ -55,7 +55,7 @@ st.markdown("""
         display: flex;
         justify-content: space-between;
         gap: 15px;
-        margin-bottom: 12px;
+        margin-bottom: 20px;
         width: 100%;
     }
     .market-card {
@@ -63,7 +63,7 @@ st.markdown("""
         background-color: #131722;
         border: 1px solid #2a2e39;
         border-radius: 4px;
-        padding: 10px 15px;
+        padding: 12px 18px;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -79,7 +79,7 @@ st.markdown("""
     }
     .market-value {
         color: #cbd5e1;
-        font-size: 0.9rem;
+        font-size: 0.95rem;
         font-weight: bold;
     }
     
@@ -112,7 +112,7 @@ st.markdown("""
     .neon-blue { color: #3b82f6; text-shadow: 0 0 10px rgba(59, 130, 246, 0.3); }
     .neon-purple { color: #ff9f43; text-shadow: 0 0 10px rgba(255, 159, 67, 0.3); }
     
-    /* Abas Premium no estilo Terminal Financeiro */
+    /* Abas Premium Estilo Bloomberg/TradingView */
     button[data-baseweb="tab"] {
         background-color: #131722 !important;
         color: #787b86 !important;
@@ -175,21 +175,21 @@ def raspar_dados_deye(usuario, senha):
         return 875.46, 13.89, 350.2
 
 # Ativação silenciosa do robô
-with st.spinner("🔄 Estabelecendo conexão segura com Deye Cloud Engine..."):
+with st.spinner("🔄 Sincronizando arquitetura com a central de telemetria Deye Cloud..."):
     producao_total_mwh, producao_mensal_mwh, potencia_instantanea_kw = raspar_dados_deye(DEYE_USER_OCULTO, DEYE_PASS_OCULTO)
 
-# --- BARRA DE COMANDO INTEGRADA FIXA ---
+# --- BARRA DE COMANDO INTEGRADA FIXA NO TOPO ---
 fuso_brasil = timezone(timedelta(hours=-3))
 st.markdown("""
     <div class="command-bar">
-        <div>❖ SANTO HOUSE SOLAR TERMINAL v5.0 // ENTERPRISE DATA ARCHITECTURE</div>
+        <div>❖ SANTO HOUSE SOLAR TERMINAL v5.2 // ENTERPRISE CENTRALIZED MODULE</div>
         <div>SYS TIME: <b>{}</b></div>
-        <div style="color: #10b981; font-weight: bold; letter-spacing: 1px;">● LIVE SYNCHRONIZATION ONLINE</div>
+        <div style="color: #10b981; font-weight: bold; letter-spacing: 1px;">● LIVE PROCESSING ACTIVE</div>
     </div>
 """.format(datetime.now(fuso_brasil).strftime("%d/%m/%Y %H:%M:%S")), unsafe_allow_html=True)
 
 
-# --- PAINEL LATERAL DE ENGENHARIA FINANCEIRA DE PROJEÇÃO ---
+# --- PAINEL LATERAL DE CONFIGURAÇÕES DO SIMULADOR CONTÁBIL ---
 try:
     side_col1, side_col2, side_col3 = st.sidebar.columns([1, 4, 1])
     with side_col2:
@@ -227,7 +227,7 @@ elif "Agressivo" in perfil:
 else:
     st.sidebar.markdown("---")
     ativar_expansao = st.sidebar.toggle("Ativar Novas Expansões", value=True)
-    if ativar_expansao:
+    if activar_expansao:
         meses_para_nova_usina = st.sidebar.slider("Frequência de Nova Usina (Meses)", 1, 24, 6)
         max_usinas = st.sidebar.slider("Quantidade Máxima Total de Usinas", 1, 30, 5)
     else:
@@ -236,7 +236,7 @@ else:
         max_usinas = 1
 
 
-# 5. CONSTRUÇÃO DO DIRETÓRIO DE DADOS DO SIMULADOR (BACKGROUND ENGINE)
+# 5. ENGINE MATEMÁTICO DO SIMULADOR DE PROJEÇÃO
 data = []
 caixa_acumulado = 0.0
 total_sacado_investidor = 0.0
@@ -314,7 +314,7 @@ for m in range(1, months_projection + 1):
 
 df_completo = pd.DataFrame(data)
 
-# Configurações de Design Reutilizáveis dos Gráficos (TradingView)
+# Configurações de Eixos e Estilos de Gráficos (TradingView Standard)
 layout_charts = dict(
     paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#787b86', size=10),
     xaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False),
@@ -324,7 +324,7 @@ layout_charts = dict(
 
 
 # ==============================================================================
-# 🚀 CRIAÇÃO DAS PÁGINAS EM ABAS GLOBAIS (UX CENTRALIZADA E ORGANIZADA)
+# 🚀 INTERFACE MULTI-PÁGINAS: CONTROLE E ISOLAMENTO DE SISTEMAS
 # ==============================================================================
 tab_telemetria, tab_calculadora = st.tabs([
     "⚡ USINA EM TEMPO REAL (DEYE CLOUD)", 
@@ -333,14 +333,15 @@ tab_telemetria, tab_calculadora = st.tabs([
 
 
 # ==============================================================================
-# PÁGINA NOVA 1: CENTRAL DE TELEMETRIA REAL DA USINA (APENAS CONEXÃO WEBSCRAPING)
+# ABA 1: CENTRAL DE MONITORAMENTO REAL DA USINA (DADOS PURAMENTE WEBSCRAPING)
 # ==============================================================================
 with tab_telemetria:
-    # 1. Cabeçalho de Métricas Reais Convertidas em Dinheiro
+    # Tratamentos financeiros reativos baseados nos MWh vindos da nuvem
     geracao_reais_por_minuto = (potencia_instantanea_kw * VALOR_KWH_OCULTO) / 60.0
     faturamento_mensal_real = (producao_mensal_mwh * 1000) * VALOR_KWH_OCULTO
     faturamento_historico_real = (producao_total_mwh * 1000) * VALOR_KWH_OCULTO
     
+    # 1. Painel de Indicadores de Mercado (Limpos e Sem Credenciais de Login)
     st.markdown(f"""
         <div class="market-header-container">
             <div class="market-card">
@@ -358,20 +359,20 @@ with tab_telemetria:
         </div>
     """, unsafe_allow_html=True)
     
-    # 2. Métricas Técnicas Secundárias de Engenharia Solar
+    # 2. Cards Técnicos Secundários
     col_t1, col_t2, col_t3 = st.columns(3)
     with col_t1:
         render_metric_card("Volume Histórico Total", f"{producao_total_mwh:,.2f} MWh", "neon-purple")
     with col_t2:
         render_metric_card("Geração Consolidada Mês", f"{producao_mensal_mwh:,.2f} MWh", "neon-blue")
     with col_t3:
-        render_metric_card("Capacidade Operacional Ativa", f"{df_completo['Usinas'].iloc[-1]} Planta(s) Integrada(s)", "neon-green")
+        render_metric_card("Capacidade Operacional Ativa", f"{df_completo['Usinas'].iloc[-1]} Planta(s) Monitorada(s)", "neon-green")
 
     st.markdown("<br>", unsafe_allow_html=True)
     row_g1, row_g2 = st.columns(2)
     
     with row_g1:
-        st.markdown("""<div class="panel-title-bar">☀️ CURVA DIÁRIA DE INJEÇÃO (TEMPO REAL OPERACIONAL)</div>""", unsafe_allow_html=True)
+        st.markdown("""<div class="panel-title-bar">☀️ CURVA DIÁRIA DE INJEÇÃO (OPERACIONAL LIVE)</div>""", unsafe_allow_html=True)
         horas_dia = [f"{h:02d}:00" for h in range(5, 19)]
         eficiencia_solar = [0.0, 0.15, 0.45, 0.78, 0.95, 1.0, 0.98, 0.85, 0.60, 0.35, 0.10, 0.0]
         potencia_curva = [potencia_instantanea_kw * f for f in eficiencia_solar[:len(horas_dia)]]
@@ -383,25 +384,25 @@ with tab_telemetria:
         st.plotly_chart(fig_curva, use_container_width=True, config={'displayModeBar': False})
 
     with row_g2:
-        st.markdown("""<div class="panel-title-bar">📊 PERFORMANCE ACUMULADA ANUAL DE ENERGIA (MWh)</div>""", unsafe_allow_html=True)
+        st.markdown("""<div class="panel-title-bar">📊 PERFORMANCE FÍSICA ANUAL DA ENERGIA (MWh)</div>""", unsafe_allow_html=True)
         df_agrupado_ano = df_completo.groupby("Ano")["Faturamento Bruto"].sum().reset_index()
         df_agrupado_ano["MWh_Estimado"] = (df_agrupado_ano["Faturamento Bruto"] / VALOR_KWH_OCULTO) / 1000
         
-        fig_barras = go.Figure(go.Bar(x=df_agrupado_ano["Ano"], y=df_agrupado_ano["MWh_Estimado"], marker_color="#3B82F6", name="Volume Injetado"))
+        fig_barras = go.Figure(go.Bar(x=df_agrupado_ano["Ano"], y=df_agrupado_ano["MWh_Estimado"], marker_color="#3B82F6", name="Injeção Técnica"))
         fig_barras.update_layout(**layout_charts, height=280)
         fig_barras.update_yaxes(title_text="Energia Injetada (MWh)")
         st.plotly_chart(fig_barras, use_container_width=True, config={'displayModeBar': False})
         
     st.markdown("""<div style="background-color: #131722; border: 1px solid #2a2e39; padding: 20px; border-radius: 4px; color: #cbd5e1; font-size: 0.85rem; line-height: 1.6;">
-        <b>⚡ Relatório de Performance Física:</b> Todas as informações exibidas nesta página são extraídas diretamente da central de monitoramento Deye Cloud através de web-scraping automatizado. O faturamento exibido no cabeçalho utiliza a tarifa regulada oculta sobre o volume real auditado do medidor.
+        <b>⚡ Relatório de Performance de Engenharia:</b> Todas as informações operacionais exibidas nesta página são extraídas de forma autônoma e segura diretamente da nuvem Deye Cloud. O faturamento estruturado no topo do painel aplica a tarifa oculta auditada diretamente sob a telemetria consolidada dos medidores.
     </div>""", unsafe_allow_html=True)
 
 
 # ==============================================================================
-# PÁGINA 2: CALCULADORA DE INVESTIMENTOS E PROJEÇÕES FINANCEIRAS ORIGINAL
+# ABA 2: SIMULADOR FINANCEIRO ORIGINAL EXATAMENTE COMO ERA ANTES
 # ==============================================================================
 with tab_calculadora:
-    # 1. Filtro Temporal Exclusivo do Simulador
+    # 1. Filtro Cronológico Exclusivo da Projeção de Investimento
     st.markdown("""<div class="panel-title-bar">📅 FILTRO TEMPORAL CRONOLÓGICO DA PROJEÇÃO</div>""", unsafe_allow_html=True)
     c_filtro1, c_filtro2 = st.columns([1, 3])
     with c_filtro1:
@@ -414,12 +415,12 @@ with tab_calculadora:
     else:
         df = df_completo.copy()
 
-    # Recálculo matemático reativo das métricas da simulação
+    # Recálculos das métricas reativas da tabela simulada
     retorno_solar_total = df["Valor Total Negócio"].iloc[-1]
     caixa_final_exibido = df["Caixa Acumulado"].iloc[-1]
     saque_final_exibido = df["Saque Acumulado"].iloc[-1] if tipo_filtro == "Histórico Completo" else df["Saque Mensal"].sum()
 
-    # 2. Cards de Métricas Financeiras Originais do Simulador
+    # 2. Os Três Cards Financeiros Originais da Calculadora
     with st.container():
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1:
@@ -431,7 +432,7 @@ with tab_calculadora:
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 3. Gráficos Financeiros Originais do Simulador
+    # 3. Painel de Gráficos Financeiros Originais
     row2_col1, row2_col2 = st.columns(2)
 
     with row2_col1:
@@ -455,7 +456,7 @@ with tab_calculadora:
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 4. Painel de Comparativo de ROI e Insights para o Pitch
+    # 4. Painel de Comparação de ROI de Mercado e Insights para o Pitch
     row3_col1, row3_col2 = st.columns([1.2, 1])
     with row3_col1:
         st.markdown("""<div class="panel-title-bar">🏛️ COMPARATIVO EM JUROS COMPOSTOS DE MERCADO</div>""", unsafe_allow_html=True)
@@ -471,6 +472,6 @@ with tab_calculadora:
         multiplicador = df_completo["Valor Total Negócio"].iloc[-1] / (retorno_cdi_final if retorno_cdi_final > 0 else 1)
         st.markdown(f"""<div style="background-color: #131722; border: 1px solid #2a2e39; padding: 15px; height: 140px; font-size: 0.85rem; color: #cbd5e1; line-height: 1.5;">Ao adotar a estratégia selecionada, o capital injetado se multiplica através do efeito caixa livre. O modelo operacional solar entrega um retorno total estimado de <b style="color:#10b981;">{multiplicador:.1f}x maior que o CDI</b>, capitalizando a tarifa em patrimônio sólido consolidado.</div>""", unsafe_allow_html=True)
 
-    # 5. Tabela de Auditoria Mês a Mês Original
+    # 5. Tabela Inalterada de Auditoria Mês a Mês
     st.markdown("""<div class="panel-title-bar">📋 TABELA DE AUDITORIA DO TERMINAL (MÊS A MÊS)</div>""", unsafe_allow_html=True)
     st.dataframe(df.style.format({"Faturamento Bruto": formato_real, "Fat. Sem Reajuste": formato_real, "Parcelas Banco": formato_real, "Lucro Líquido": formato_real, "Saque Mensal": formato_real, "Caixa Acumulado": formato_real, "Patrimônio Usinas": formato_real, "Valor Total Negócio": formato_real}), use_container_width=True, height=200, hide_index=True)
