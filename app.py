@@ -98,7 +98,7 @@ if botao_iniciar:
 
             elif "Growatt" in canal_alvo:
                 u_in = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@id='val_login_account' or @name='username']")))
-                p_in = driver.find_element(By.XPATH, "//input[@id='val_login_pwd' or @name='password']")))
+                p_in = driver.find_element(By.XPATH, "//input[@id='val_login_pwd' or @name='password']")
                 u_in.send_keys(creds["user"])
                 p_in.send_keys(creds["pass"])
                 btn = driver.find_element(By.XPATH, "//*[contains(@class, 'btn-login') or @type='submit']")
@@ -114,7 +114,7 @@ if botao_iniciar:
 
             elif "FoxESS" in canal_alvo:
                 u_in = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@id='username' or @placeholder='Username']")))
-                p_in = driver.find_element(By.XPATH, "//input[@id='password' or @placeholder='Password']"))
+                p_in = driver.find_element(By.XPATH, "//input[@id='password' or @placeholder='Password']")
                 u_in.send_keys(creds["user"])
                 p_in.send_keys(creds["pass"])
                 btn = driver.find_element(By.XPATH, "//*[contains(@class, 'login-btn') or @type='button']")
@@ -122,7 +122,7 @@ if botao_iniciar:
 
             elif "Fronius" in canal_alvo:
                 u_in = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@id='username' or @name='username']")))
-                p_in = driver.find_element(By.XPATH, "//input[@id='password' or @name='password']"))
+                p_in = driver.find_element(By.XPATH, "//input[@id='password' or @name='password']")
                 u_in.send_keys(creds["user"])
                 p_in.send_keys(creds["pass"])
                 btn = driver.find_element(By.XPATH, "//button[@id='login-btn' or @type='submit']")
