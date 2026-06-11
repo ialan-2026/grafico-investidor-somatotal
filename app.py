@@ -10,31 +10,42 @@ from selenium.webdriver.support import expected_conditions as EC
 
 st.set_page_config(page_title="Engenharia de Telemetria Solar", layout="wide")
 
+# Banco de dados de conexões unificado
 DADOS_CONEXAO = {
-    "Canal 01 (Solarman/Deye)": {"url": "https://pro.solarmanpv.com/login", "user": "solaralbano@gmail.com", "pass": "mBA4rvnSMuc5"},
-    "Canal 02 (ShineMonitor)": {"url": "https://www.shinemonitor.com/", "user": "Albano Solar", "pass": "oNa17112#"},
-    "Canal 03 (Hopewind)": {"url": "https://hopewindcloud.eu/#/login", "user": "solaralbano@gmail.com", "pass": "oNa17112"},
-    "Canal 04 (Growatt)": {"url": "https://oss.growatt.com/login?lang=en", "user": "EBBJQA001", "pass": "Solarjob123"},
-    "Canal 05 (Hoymiles)": {"url": "https://global.hoymiles.com/website", "user": "solarjob", "pass": "Solarjob@123"},
-    "Canal 06 (FoxESS)": {"url": "https://www.foxesscloud.com/v2/login", "user": "solarjob", "pass": "Solarjob@123"},
-    "Canal 07 (Fronius)": {"url": "https://login.fronius.com/authenticationendpoint/login.do?client_id=mf_o9iTAyKemNLQTa6Sp6HYonCIa", "user": "engenharia@solarjob.com.br", "pass": "Solarjob@1234"}
+    "Canal 01 (Solarman/Deye)": {"url": "https://pro.solarmanpv.com/login", "user": "solaralbano@gmail.com", "pass": "mBA4rvnSMuc5", "tipo": "solarman"},
+    "Canal 02 (ShineMonitor)": {"url": "https://www.shinemonitor.com/", "user": "Albano Solar", "pass": "oNa17112#", "tipo": "shinemonitor"},
+    "Canal 03 (Hopewind)": {"url": "https://hopewindcloud.eu/#/login", "user": "solaralbano@gmail.com", "pass": "oNa17112", "tipo": "hopewind"},
+    "Canal 04 (Growatt)": {"url": "https://oss.growatt.com/login?lang=en", "user": "EBBJQA001", "pass": "Solarjob123", "tipo": "growatt"},
+    "Canal 05 (Hoymiles)": {"url": "https://global.hoymiles.com/website", "user": "solarjob", "pass": "Solarjob@123", "tipo": "hoymiles"},
+    "Canal 06 (FoxESS)": {"url": "https://www.foxesscloud.com/v2/login", "user": "solarjob", "pass": "Solarjob@123", "tipo": "foxess"},
+    "Canal 07 (Fronius)": {"url": "https://login.fronius.com/authenticationendpoint/login.do?client_id=mf_o9iTAyKemNLQTa6Sp6HYonCIa", "user": "engenharia@solarjob.com.br", "pass": "Solarjob@1234", "tipo": "fronius"}
 }
 
 st.markdown("""
     <style>
     .stApp { background-color: #0c0f16; font-family: 'Consolas', monospace; color: #cbd5e1; }
-    .console-box { background-color: #131722; border: 1px solid #2a2e39; border-radius: 4px; padding: 15px; font-size: 0.82rem; }
+    .status-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.85rem; }
+    .status-table th { background-color: #1e2232; color: #787b86; padding: 10px; text-align: left; border: 1px solid #2a2e39; }
+    .status-table td { padding: 10px; border: 1px solid #2a2e39; background-color: #131722; }
+    .badge-ok { color: #10b981; font-weight: bold; }
+    .badge-err { color: #f43f5e; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ LAB DE ENGENHARIA E DIAGNÓSTICO SOLAR v1.3")
+st.title("⚡ LAB DE ENGENHARIA E TELEMETRIA PRECOGNITIVA v1.5")
 st.markdown("---")
 
+# Inicialização da memória de persistência de dados entre os reloads do Streamlit
+if "historico_leituras" not in st.session_state:
+    st.session_state.historico_leituras = {k: {"potencia": "0 kW", "diaria": "0 kWh", "mensal": "0 MWh", "total": "0 MWh", "status": "Aguardando Varredura", "timestamp": "-"} for k in DADOS_CONEXAO.keys()}
+
 col1, col2 = st.columns([1, 2])
+
 with col1:
-    canal_alvo = st.selectbox("Escolha a Integradora para Validar:", list(DADOS_CONEXAO.keys()))
-    tempo_aguardo = st.slider("Tempo de Carregamento da Página (segundos)", 3, 25, 12)
-    botao_iniciar = st.button("🚀 INICIAR CAPTURA DE TELEMETRIA EM LIVE", use_container_width=True)
+    st.subheader("⚙️ Parâmetros do Ciclo")
+    tempo_estabilizacao = st.slider("Tempo de Espera Pós-Login (segundos)", 5, 25, 12)
+    intervalo_loop = st.slider("Intervalo entre Canais (segundos)", 5, 60, 25)
+    loop_ativo = st.toggle("Ativar Varredura Cíclica Automática", value=False)
 
 def inicializar_driver_antidetect():
     options = Options()
@@ -46,25 +57,56 @@ def inicializar_driver_antidetect():
     options.add_argument("--disable-blink-features=AutomationControlled")
     return webdriver.Chrome(options=options)
 
-if botao_iniciar:
-    creds = DADOS_CONEXAO[canal_alvo]
-    logs = []
-    
-    with col2:
-        st.subheader(f"🛠️ Console Log: {canal_alvo}")
-        status_placeholder = st.empty()
-        console_placeholder = st.empty()
-        
-        def print_log(texto):
-            logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] {texto}")
-            console_placeholder.code("\n".join(logs))
+def extrair_valor_regex(padrao, texto, default="0.0"):
+    try:
+        busca = re.search(padrao, texto, re.IGNORECASE)
+        return busca.group(1).strip() if busca else default
+    except:
+        return default
 
+# Interface de Monitoramento em Tempo Real
+with col2:
+    st.subheader("📊 Painel de Controle e Coleta Consolidada")
+    
+    # Renderização da Tabela Corporativa White-Label de Engenharia
+    html_tabela = """<table class="status-table">
+        <tr>
+            <th>IDENTIFICAÇÃO</th>
+            <th>POTÊNCIA LIVE</th>
+            <th>PROD. DIÁRIA</th>
+            <th>PROD. MENSAL</th>
+            <th>PROD. HISTÓRICA</th>
+            <th>INTEGRIDADE</th>
+            <th>ÚLT. LEITURA</th>
+        </tr>"""
+    
+    for canal, dados in st.session_state.historico_leituras.items():
+        cor_status = "badge-ok" if "ONLINE" in dados["status"] else ("badge-err" if "FALHA" in dados["status"] else "")
+        html_tabela += f"""<tr>
+            <td><b>{canal}</b></td>
+            <td>{dados['potencia']}</td>
+            <td>{dados['diaria']}</td>
+            <td>{dados['mensal']}</td>
+            <td>{dados['total']}</td>
+            <td class="{cor_status}">{dados['status']}</td>
+            <td>{dados['timestamp']}</td>
+        </tr>"""
+    html_tabela += "</table>"
+    st.markdown(html_tabela, unsafe_allow_html=True)
+
+    console_placeholder = st.empty()
+
+# --- EXECUÇÃO DO LOOP DA MALHA DE CAPTURA ---
+if loop_ativo:
+    for canal_alvo in DADOS_CONEXAO.keys():
+        creds = DADOS_CONEXAO[canal_alvo]
+        console_placeholder.info(f"🔄 Iniciando Conexão Segura: {canal_alvo}...")
+        
         driver = inicializar_driver_antidetect()
         driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
             "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         })
 
-        # FUNÇÃO CRÍTICA: Força o input do navegador disparando os gatilhos dos frameworks React/Vue/Angular
         def forcar_preenchimento(elemento, valor):
             driver.execute_script("""
                 arguments[0].value = arguments[1];
@@ -74,109 +116,108 @@ if botao_iniciar:
             """, elemento, valor)
 
         try:
-            status_placeholder.warning("🔄 Passo 1: Carregando URL de Autenticação...")
             driver.get(creds["url"])
             wait = WebDriverWait(driver, 15)
-            print_log(f"Conectado com sucesso em: {creds['url']}")
 
-            status_placeholder.warning("🔄 Passo 2: Injetando Payload com Emulação de Eventos Nativos...")
-            
-            if "Solarman" in canal_alvo:
-                # Filtragem estrita para pegar o input que está visível de verdade na tela desktop
+            # Execução estruturada dos payloads de login por canal
+            if creds["tipo"] == "solarman":
                 inputs = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//input[@type='text']")))
                 u_in = [i for i in inputs if i.is_displayed()][0]
                 p_in = driver.find_element(By.XPATH, "//input[@type='password']")
-                
                 forcar_preenchimento(u_in, creds["user"])
                 forcar_preenchimento(p_in, creds["pass"])
-                
                 btn = driver.find_element(By.XPATH, "//button[@type='submit' or contains(text(), 'Login')]")
                 driver.execute_script("arguments[0].click();", btn)
                 
-            elif "ShineMonitor" in canal_alvo:
-                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@id, 'username') or contains(@id, 'email') or @type='text']")))
+            elif creds["tipo"] == "shinemonitor":
+                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@id, 'username') or @type='text']")))
                 p_in = driver.find_element(By.XPATH, "//input[contains(@id, 'password') or @type='password']")
-                
                 forcar_preenchimento(u_in, creds["user"])
                 forcar_preenchimento(p_in, creds["pass"])
-                
                 btn = driver.find_element(By.XPATH, "//*[contains(@id, 'login') or @type='submit' or contains(@class, 'btn')]")
                 driver.execute_script("arguments[0].click();", btn)
 
-            elif "Hopewind" in canal_alvo:
+            elif creds["tipo"] == "hopewind":
                 u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@placeholder, 'Account')]")))
                 p_in = driver.find_element(By.XPATH, "//input[@type='password']")
-                
-                forcar_preenchimento(u_in, creds["user"])
-                forcar_preenchimento(p_in, creds["pass"])
-                
-                # Clique forçado no checkbox oculto de politicas da Hopewind
+                forcar_input_framework(u_in, creds["user"])
+                forcar_input_framework(p_in, creds["pass"])
                 try:
-                    checkbox_termos = driver.find_element(By.XPATH, "//input[@type='checkbox'] or //span[contains(@class, 'checkbox')]")
-                    driver.execute_script("arguments[0].click();", checkbox_termos)
-                    print_log("Gatilho de Aceite de Privacidade acionado via JS.")
-                except:
-                    pass
-                
+                    checkbox = driver.find_element(By.XPATH, "//input[@type='checkbox'] or //span[contains(@class, 'checkbox')]")
+                    driver.execute_script("arguments[0].click();", checkbox)
+                except: pass
                 btn = driver.find_element(By.XPATH, "//button[contains(@class, 'el-button--primary') or @type='button']")
                 driver.execute_script("arguments[0].click();", btn)
 
-            elif "Growatt" in canal_alvo:
+            elif creds["tipo"] == "growatt":
                 u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@id='username' or @id='val_login_account' or @name='username']")))
                 p_in = driver.find_element(By.XPATH, "//input[@id='password' or @id='val_login_pwd' or @name='password']")
-                
                 forcar_preenchimento(u_in, creds["user"])
                 forcar_preenchimento(p_in, creds["pass"])
-                
                 btn = driver.find_element(By.XPATH, "//*[contains(@class, 'login') or @type='submit']")
                 driver.execute_script("arguments[0].click();", btn)
 
-            elif "Hoymiles" in canal_alvo:
+            elif creds["tipo"] == "hoymiles":
                 u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='text']")))
                 p_in = driver.find_element(By.XPATH, "//input[@type='password']")
-                
                 forcar_preenchimento(u_in, creds["user"])
                 forcar_preenchimento(p_in, creds["pass"])
-                
                 btn = driver.find_element(By.CLASS_NAME, "ant-btn-primary")
                 driver.execute_script("arguments[0].click();", btn)
 
-            elif "FoxESS" in canal_alvo:
+            elif creds["tipo"] == "foxess":
                 u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@id, 'user') or @placeholder='Username' or @type='text']")))
                 p_in = driver.find_element(By.XPATH, "//input[contains(@id, 'pass') or @placeholder='Password' or @type='password']")
-                
                 forcar_preenchimento(u_in, creds["user"])
                 forcar_preenchimento(p_in, creds["pass"])
-                
                 btn = driver.find_element(By.XPATH, "//*[contains(@class, 'login') or @type='button' or @type='submit']")
                 driver.execute_script("arguments[0].click();", btn)
 
-            elif "Fronius" in canal_alvo:
+            elif creds["tipo"] == "fronius":
                 u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@id='username' or @name='username' or @type='text']")))
                 p_in = driver.find_element(By.XPATH, "//input[@id='password' or @name='password' or @type='password']")
-                
                 forcar_preenchimento(u_in, creds["user"])
                 forcar_preenchimento(p_in, creds["pass"])
-                
                 btn = driver.find_element(By.XPATH, "//*[contains(@id, 'login') or @type='submit']")
                 driver.execute_script("arguments[0].click();", btn)
 
-            print_log("Payload injetado e disparado com sincronismo de Virtual DOM.")
-            status_placeholder.warning(f"🔄 Passo 3: Aguardando processamento e redirecionamento ({tempo_aguardo}s)...")
-            time.sleep(tempo_aguardo)
+            time.sleep(tempo_estabilizacao)
+            corpo_texto = driver.find_element(By.TAG_NAME, "body").text
+            
+            # --- PARSERS DINÂMICOS BASEADOS NAS ASSINATURAS TEXTUAIS DE CADA PORTAL ---
+            pot, dia, mes, tot = "0 kW", "0 kWh", "0 MWh", "0 MWh"
+            
+            if creds["tipo"] == "solarman":
+                linhas = corpo_texto.split('\n')
+                for i, linha in enumerate(linhas):
+                    if "tempo real" in linha and i+1 < len(linhas): pot = linhas[i+1]
+                    if "diária" in linha and i+1 < len(linhas): dia = linhas[i+1]
+                    if "mensal" in linha and i+1 < len(linhas): mes = linhas[i+1]
+                    if "total" in server_linha and i+1 < len(linhas): tot = linhas[i+1]
+            elif creds["tipo"] == "hoymiles":
+                mes = extrair_valor_regex(r"This month\n([\d.,\s\w]+)", corpo_texto, "0 MWh")
+                tot = extrair_valor_regex(r"Lifetime\n([\d.,\s\w]+)", corpo_texto, "0 MWh")
+            elif creds["tipo"] == "shinemonitor":
+                pot = extrair_valor_regex(r"Current Power\n([\d.,\s\w]+)", corpo_texto, "0 kW")
+                dia = extrair_valor_regex(r"Today Energy\n([\d.,\s\w]+)", corpo_texto, "0 kWh")
+                tot = extrair_valor_regex(r"Total Energy\n([\d.,\s\w]+)", corpo_texto, "0 MWh")
+            else:
+                pot = extrair_valor_regex(r"(?:Power Now|Current Power|Potência)[\s:]*([\d.,]+\s*(?:W|kW))", corpo_texto, "0 kW")
+                dia = extrair_valor_regex(r"(?:Today|Diária)[\s:]*([\d.,]+\s*kWh)", corpo_texto, "0 kWh")
+                tot = extrair_valor_regex(r"(?:Cumulative|Total)[\s:]*([\d.,]+\s*(?:kWh|MWh))", corpo_texto, "0 MWh")
 
-            print_log(f"URL Atual pós-login: {driver.current_url}")
-            
-            status_placeholder.warning("🔄 Passo 4: Mapeando árvore de telemetria...")
-            corpo_pagina_texto = driver.find_element(By.TAG_NAME, "body").text
-            
-            st.markdown("### 📄 Texto Cru Detectado na Tela Logada:")
-            st.text_area("Dados extraídos da sessão ativa:", value=corpo_pagina_texto, height=250)
-            
-            status_placeholder.success("✅ Processo Concluído com Sucesso!")
+            # Atualização da memória global de telemetria
+            st.session_state.historico_leituras[canal_alvo] = {
+                "potencia": pot, "diaria": dia, "mensal": mes, "total": tot,
+                "status": "🟢 ONLINE (LIVE)", "timestamp": datetime.now().strftime("%H:%M:%S")
+            }
             driver.quit()
 
-        except Exception as falha:
-            print_log(f"❌ Falha de varredura: {str(falha)}")
-            status_placeholder.error("🔴 Falha encontrada. Veja os logs do Console.")
+        except Exception as err:
+            st.session_state.historico_leituras[canal_alvo]["status"] = "🔴 FALHA DE REDE"
+            st.session_state.historico_leituras[canal_alvo]["timestamp"] = datetime.now().strftime("%H:%M:%S")
             driver.quit()
+
+        # Tempo de transição entre os canais do parque fotovoltaico
+        time.sleep(intervalo_loop)
+        st.rerun()
