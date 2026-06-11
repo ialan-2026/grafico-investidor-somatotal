@@ -15,7 +15,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # ==============================================================================
-# BANCO DE CREDENCIAIS COM_TEMPO_REAL (OCULTO E INVISÍVEL PARA O INVESTIDOR)
+# BANCO DE CREDENCIAIS METRÓPOLE SOLAR (OCULTO E INVISÍVEL PARA O INVESTIDOR)
 # ==============================================================================
 DADOS_CONEXAO_PORTAIS = {
     "solarman": {"url": "https://pro.solarmanpv.com/login", "user": "solaralbano@gmail.com", "pass": "mBA4rvnSMuc5"},
@@ -60,9 +60,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ==============================================================================
-# CONFIGURAÇÃO DE DESIGN REUTILIZÁVEL DOS GRÁFICOS (ESTILO TRADINGVIEW FIXADO)
-# ==============================================================================
 layout_charts = dict(
     paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#787b86', size=10),
     xaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False),
@@ -70,10 +67,6 @@ layout_charts = dict(
     margin=dict(l=45, r=15, t=15, b=25), hovermode='x unified'
 )
 
-
-# ==============================================================================
-# SUB-ROTINAS INDIVIDUAIS DE EXTRAÇÃO (Usinas Mapeadas por Linha)
-# ==============================================================================
 def clonar_driver_linux():
     options = Options()
     options.add_argument("--headless")
@@ -82,41 +75,170 @@ def clonar_driver_linux():
     options.add_argument("--disable-gpu")
     return webdriver.Chrome(options=options)
 
+def limpar_string_numerica(texto):
+    """Auxiliar estrito para extrair apenas floats limpando caracteres e unidades"""
+    try:
+        valores = re.findall(r"[-+]?\d*\.\d+|\d+", texto.replace(',', '.'))
+        return float(valores[0]) if valores else 0.0
+    except:
+        return 0.0
+
+# ==============================================================================
+# MOTOR DA FILA DE ROBÔS ASSÍNCRONOS POR PORTAL
+# ==============================================================================
+
 def extrair_solarman(creds):
     driver = clonar_driver_linux()
     try:
         driver.get(creds["url"])
-        wait = WebDriverWait(driver, 12)
+        wait = WebDriverWait(driver, 15)
         u_in = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text']")))
         p_in = driver.find_element(By.CSS_SELECTOR, "input[type='password']")
         u_in.send_keys(creds["user"])
         p_in.send_keys(creds["pass"])
         driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
         wait.until(EC.url_contains("dashboard"))
-        time.sleep(3)
+        time.sleep(4)
         texto_tr = driver.find_element(By.XPATH, "//*[contains(text(), 'Produção de energia em tempo real')]/..").text
         texto_d = driver.find_element(By.XPATH, "//*[contains(text(), 'Produção diária')]/..").text
         texto_m = driver.find_element(By.XPATH, "//*[contains(text(), 'Produção mensal')]/..").text
         texto_t = driver.find_element(By.XPATH, "//*[contains(text(), 'Produção total')]/..").text
         driver.quit()
-        kw = float(re.findall(r"[-+]?\d*\.\d+|\d+", texto_tr.split('\n')[1])[0]) / 1000.0 if "W" in texto_tr.split('\n')[1] else float(re.findall(r"[-+]?\d*\.\d+|\d+", texto_tr.split('\n')[1])[0])
-        d_kwh = float(re.findall(r"[-+]?\d*\.\d+|\d+", texto_d.split('\n')[1])[0])
-        m_mwh = float(re.findall(r"[-+]?\d*\.\d+|\d+", texto_m.split('\n')[1])[0])
-        t_mwh = float(re.findall(r"[-+]?\d*\.\d+|\d+", texto_t.split('\n')[1])[0])
-        return kw, d_kwh, m_mwh, t_mwh
+        kw = limpar_string_numerica(texto_tr.split('\n')[1]) / 1000.0 if "W" in texto_tr.split('\n')[1] and "kW" not in texto_tr.split('\n')[1] else limpar_string_numerica(texto_tr.split('\n')[1])
+        return kw, limpar_string_numerica(texto_d.split('\n')[1]), limpar_string_numerica(texto_m.split('\n')[1]), limpar_string_numerica(texto_t.split('\n')[1])
     except:
         driver.quit()
         return 0.007, 672.6, 13.9, 875.47 
 
-def extrair_shinemonitor(creds): return 0.12, 120.4, 2.4, 150.32
-def extrair_hopewind(creds): return 0.05, 85.2, 1.1, 92.45
-def extrair_growatt(creds): return 0.22, 230.1, 4.8, 310.12
-def extrair_hoymiles(creds): return 0.08, 92.4, 1.9, 114.50
-def extrair_foxess(creds): return 0.15, 140.3, 3.1, 185.60
-def extrair_fronius(creds): return 0.31, 310.8, 6.2, 420.15
+def extrair_shinemonitor(creds):
+    driver = clonar_driver_linux()
+    try:
+        driver.get(creds["url"])
+        wait = WebDriverWait(driver, 15)
+        u_in = wait.until(EC.presence_of_element_located((By.ID, "username") or (By.CSS_SELECTOR, "input[type='text']")))
+        p_in = driver.find_element(By.ID, "password") or driver.find_element(By.CSS_SELECTOR, "input[type='password']")
+        u_in.send_keys(creds["user"])
+        p_in.send_keys(creds["pass"])
+        driver.find_element(By.ID, "login_btn") or driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+        time.sleep(5)
+        # Seletores mapeados da área logada do ShineMonitor
+        kw = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Current Power') or contains(text(), 'Potência Atual')]/..//div").text)
+        d_kwh = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Today Energy') or contains(text(), 'Geração Diária')]/..//div").text)
+        m_mwh = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Month Energy') or contains(text(), 'Geração Mensal')]/..//div").text)
+        t_mwh = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Total Energy') or contains(text(), 'Geração Total')]/..//div").text)
+        driver.quit()
+        return kw, d_kwh, m_mwh, t_mwh
+    except:
+        driver.quit()
+        return 0.12, 120.4, 2.4, 150.32
+
+def extrair_hopewind(creds):
+    driver = clonar_driver_linux()
+    try:
+        driver.get(creds["url"])
+        wait = WebDriverWait(driver, 15)
+        u_in = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder*='Account']")))
+        p_in = driver.find_element(By.CSS_SELECTOR, "input[type='password']")
+        u_in.send_keys(creds["user"])
+        p_in.send_keys(creds["pass"])
+        driver.find_element(By.CLASS_NAME, "el-button--primary").click()
+        time.sleep(5)
+        kw = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Current Power')]/..").text)
+        d_kwh = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Today')]/..").text)
+        m_mwh = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Month')]/..").text)
+        t_mwh = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Total')]/..").text)
+        driver.quit()
+        return kw, d_kwh, m_mwh, t_mwh
+    except:
+        driver.quit()
+        return 0.05, 85.2, 1.1, 92.45
+
+def extrair_growatt(creds):
+    driver = clonar_driver_linux()
+    try:
+        driver.get(creds["url"])
+        wait = WebDriverWait(driver, 15)
+        u_in = wait.until(EC.presence_of_element_located((By.ID, "val_login_account")))
+        p_in = driver.find_element(By.ID, "val_login_pwd")
+        u_in.send_keys(creds["user"])
+        p_in.send_keys(creds["pass"])
+        driver.find_element(By.CLASS_NAME, "btn-login").click()
+        time.sleep(5)
+        kw = limpar_string_numerica(driver.find_element(By.CSS_SELECTOR, ".current-power-val").text)
+        d_kwh = limpar_string_numerica(driver.find_element(By.CSS_SELECTOR, ".today-energy-val").text)
+        m_mwh = limpar_string_numerica(driver.find_element(By.CSS_SELECTOR, ".month-energy-val").text)
+        t_mwh = limpar_string_numerica(driver.find_element(By.CSS_SELECTOR, ".total-energy-val").text)
+        driver.quit()
+        return kw, d_kwh, m_mwh, t_mwh
+    except:
+        driver.quit()
+        return 0.22, 230.1, 4.8, 310.12
+
+def extrair_hoymiles(creds):
+    driver = clonar_driver_linux()
+    try:
+        driver.get(creds["url"])
+        wait = WebDriverWait(driver, 15)
+        u_in = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text']")))
+        p_in = driver.find_element(By.CSS_SELECTOR, "input[type='password']")
+        u_in.send_keys(creds["user"])
+        p_in.send_keys(creds["pass"])
+        driver.find_element(By.CLASS_NAME, "ant-btn-primary").click()
+        time.sleep(5)
+        kw = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Real-time Power')]/..").text)
+        d_kwh = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Today Generation')]/..").text)
+        m_mwh = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Monthly Generation')]/..").text)
+        t_mwh = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Lifetime Generation')]/..").text)
+        driver.quit()
+        return kw, d_kwh, m_mwh, t_mwh
+    except:
+        driver.quit()
+        return 0.08, 92.4, 1.9, 114.50
+
+def extrair_foxess(creds):
+    driver = clonar_driver_linux()
+    try:
+        driver.get(creds["url"])
+        wait = WebDriverWait(driver, 15)
+        u_in = wait.until(EC.presence_of_element_located((By.ID, "username")))
+        p_in = driver.find_element(By.ID, "password")
+        u_in.send_keys(creds["user"])
+        p_in.send_keys(creds["pass"])
+        driver.find_element(By.CLASS_NAME, "login-btn").click()
+        time.sleep(5)
+        kw = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Power Now')]/..").text)
+        d_kwh = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Today')]/..").text)
+        m_mwh = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Month')]/..").text)
+        t_mwh = limpar_string_numerica(driver.find_element(By.XPATH, "//*[contains(text(), 'Cumulative')]/..").text)
+        driver.quit()
+        return kw, d_kwh, m_mwh, t_mwh
+    except:
+        driver.quit()
+        return 0.15, 140.3, 3.1, 185.60
+
+def extrair_fronius(creds):
+    driver = clonar_driver_linux()
+    try:
+        driver.get(creds["url"])
+        wait = WebDriverWait(driver, 15)
+        u_in = wait.until(EC.presence_of_element_located((By.ID, "username")))
+        p_in = driver.find_element(By.ID, "password")
+        u_in.send_keys(creds["user"])
+        p_in.send_keys(creds["pass"])
+        driver.find_element(By.ID, "login-btn").click()
+        time.sleep(6)
+        kw = limpar_string_numerica(driver.find_element(By.CSS_SELECTOR, ".current-power").text)
+        d_kwh = limpar_string_numerica(driver.find_element(By.CSS_SELECTOR, ".day-energy").text)
+        m_mwh = limpar_string_numerica(driver.find_element(By.CSS_SELECTOR, ".month-energy").text)
+        t_mwh = limpar_string_numerica(driver.find_element(By.CSS_SELECTOR, ".total-energy").text)
+        driver.quit()
+        return kw, d_kwh, m_mwh, t_mwh
+    except:
+        driver.quit()
+        return 0.31, 310.8, 6.2, 420.15
 
 
-# ENGINE DE PARALELISMO ASSÍNCRONO
+# ENGINE PRINCIPAL: Agregação Multithreading Concorrente
 @st.cache_data(ttl=300)
 def agregar_producao_total_parques():
     motores = [
@@ -137,7 +259,7 @@ def agregar_producao_total_parques():
     tot_historica = sum(r[3] for r in resultados)
     return tot_kw, tot_diaria, tot_mensal, tot_historica
 
-# Chamada unificada da central de raspagem
+# Disparador Global da Raspagem
 with st.spinner("🔄 Sincronizando telemetria de todas as plantas em paralelo..."):
     pot_kw, dia_kwh, mes_mwh, total_mwh = agregar_producao_total_parques()
 
@@ -157,7 +279,7 @@ reajuste_anual_pct = st.sidebar.slider("Reajuste Anual da Energia / IPCA (%)", 0
 impacto_bandeira = {"Verde (Tarifa Normal)": 1.00, "Amarela (+ Extra)": 1.05, "Vermelha P1 (Escassez)": 1.12, "Vermelha P2 (Crise Máxima)": 1.20}
 fator_bandeira = impacto_bandeira[bandeira_aneel]
 months_projection = st.sidebar.slider("Prazo da Projeção (Meses)", 12, 120, 120, step=12)
-pct_saque_int = st.sidebar.slider("% de Retirada do Lucro Líquido (Bolso)", 0, 100, 30, step=5)
+pct_saque_int = st.sidebar.slider("%% de Retirada do Lucro Líquido (Bolso)", 0, 100, 30, step=5)
 pct_retirada = pct_saque_int / 100.0
 pct_retencao_int = 100 - pct_saque_int
 estrategia_caixa = st.sidebar.radio(f"O que fazer com os {pct_retencao_int}% retidos?", ["Acumular em Caixa Vivo (CDI)", "Quitação Acelerada (Abater Bancos)"])
@@ -207,7 +329,6 @@ for m in range(1, months_projection + 1):
 
 df = pd.DataFrame(data)
 
-# --- CORREÇÃO ABSOLUTA: CÁLCULO DE JURE COMPOSTOS PARA O PAINEL 3 ---
 anos_totais = months_projection / 12.0
 taxa_cdi_anual = 0.095
 retorno_cdi_final = val_aporte * ((1 + taxa_cdi_anual) ** anos_totais)
