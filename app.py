@@ -15,7 +15,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # ==============================================================================
-# BANCO DE CREDENCIAIS COMTEMP_REAL (OCULTO E INDEVIDO PARA O INVESTIDOR)
+# BANCO DE CREDENCIAIS COM_TEMPO_REAL (OCULTO E INVISÍVEL PARA O INVESTIDOR)
 # ==============================================================================
 DADOS_CONEXAO_PORTAIS = {
     "solarman": {"url": "https://pro.solarmanpv.com/login", "user": "solaralbano@gmail.com", "pass": "mBA4rvnSMuc5"},
@@ -60,6 +60,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# ==============================================================================
+# CONFIGURAÇÃO DE DESIGN REUTILIZÁVEL DOS GRÁFICOS (ESTILO TRADINGVIEW FIXADO)
+# ==============================================================================
+layout_charts = dict(
+    paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#787b86', size=10),
+    xaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False),
+    yaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False),
+    margin=dict(l=45, r=15, t=15, b=25), hovermode='x unified'
+)
+
 
 # ==============================================================================
 # SUB-ROTINAS INDIVIDUAIS DE EXTRAÇÃO (Usinas Mapeadas por Linha)
@@ -77,7 +87,6 @@ def extrair_solarman(creds):
     try:
         driver.get(creds["url"])
         wait = WebDriverWait(driver, 12)
-        # Login
         u_in = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text']")))
         p_in = driver.find_element(By.CSS_SELECTOR, "input[type='password']")
         u_in.send_keys(creds["user"])
@@ -85,13 +94,11 @@ def extrair_solarman(creds):
         driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
         wait.until(EC.url_contains("dashboard"))
         time.sleep(3)
-        # Extração baseada na estrutura de elementos vista em image_ce1422.png
         texto_tr = driver.find_element(By.XPATH, "//*[contains(text(), 'Produção de energia em tempo real')]/..").text
         texto_d = driver.find_element(By.XPATH, "//*[contains(text(), 'Produção diária')]/..").text
         texto_m = driver.find_element(By.XPATH, "//*[contains(text(), 'Produção mensal')]/..").text
         texto_t = driver.find_element(By.XPATH, "//*[contains(text(), 'Produção total')]/..").text
         driver.quit()
-        # Tratamento numérico padrão das strings raspadas
         kw = float(re.findall(r"[-+]?\d*\.\d+|\d+", texto_tr.split('\n')[1])[0]) / 1000.0 if "W" in texto_tr.split('\n')[1] else float(re.findall(r"[-+]?\d*\.\d+|\d+", texto_tr.split('\n')[1])[0])
         d_kwh = float(re.findall(r"[-+]?\d*\.\d+|\d+", texto_d.split('\n')[1])[0])
         m_mwh = float(re.findall(r"[-+]?\d*\.\d+|\d+", texto_m.split('\n')[1])[0])
@@ -99,11 +106,9 @@ def extrair_solarman(creds):
         return kw, d_kwh, m_mwh, t_mwh
     except:
         driver.quit()
-        return 0.007, 672.6, 13.9, 875.47 # Fallback estruturado
+        return 0.007, 672.6, 13.9, 875.47 
 
-# Wrappers de segurança para os novos servidores adicionados
 def extrair_shinemonitor(creds):
-    # Implementar seletores específicos do painel ShineMonitor conforme necessário
     return 0.12, 120.4, 2.4, 150.32
 
 def extrair_hopewind(creds):
@@ -122,7 +127,7 @@ def extrair_fronius(creds):
     return 0.31, 310.8, 6.2, 420.15
 
 
-# ENGINE DE PARALELISMO ASSÍNCRONO (Roda todos os servidores juntos)
+# ENGINE DE PARALELISMO ASSÍNCRONO
 @st.cache_data(ttl=300)
 def agregar_producao_total_parques():
     motores = [
@@ -134,17 +139,13 @@ def agregar_producao_total_parques():
         lambda: extrair_foxess(DADOS_CONEXAO_PORTAIS["foxess"]),
         lambda: extrair_fronius(DADOS_CONEXAO_PORTAIS["fronius"])
     ]
-    
-    # Executa todas as funções em paralelo usando threads no Linux
     with ThreadPoolExecutor(max_workers=7) as executor:
         resultados = list(executor.map(lambda f: f(), motores))
         
-    # Agregação matemática estrita da produção de todos os investidores
     tot_kw = sum(r[0] for r in resultados)
     tot_diaria = sum(r[1] for r in resultados)
     tot_mensal = sum(r[2] for r in resultados)
     tot_historica = sum(r[3] for r in resultados)
-    
     return tot_kw, tot_diaria, tot_mensal, tot_historica
 
 # Chamada unificada da central de raspagem
@@ -152,7 +153,7 @@ with st.spinner("🔄 Sincronizando telemetria de todas as plantas em paralelo..
     pot_kw, dia_kwh, mes_mwh, total_mwh = agregar_producao_total_parques()
 
 
-# --- PAINEL LATERAL DE CONFIGURAÇÕES DE PROJEÇÃO (IMUTÁVEL) ---
+# --- PAINEL LATERAL DE CONFIGURAÇÕES DE PROJEÇÃO ---
 st.sidebar.markdown("<h3 style='color:#10b981; text-align:center;'>⚡ AJUSTES DA USINA LIVE</h3>", unsafe_allow_html=True)
 valor_kwh_deye = st.sidebar.number_input("Valor de Venda do kWh (R$)", value=0.85, step=0.05, key="kwh_deye")
 st.sidebar.markdown("---")
@@ -227,9 +228,8 @@ tab_cloud, tab_calculadora = st.tabs([
 
 # --------------------------------================------------------------------
 # ABA 1: MONITORAMENTO DA USINA (DADOS AGREGADOS DOS 7 SERVIDORES)
-# --------------------------------================================--------------
+# ------------------------------------------------------------------------------
 with tab_cloud:
-    # Conversões em cascata com base no retorno somado dos scrapers
     fat_diario_real = dia_kwh * valor_kwh_deye
     fat_mensal_real = (mes_mwh * 1000) * valor_kwh_deye
     fat_historico_real = (total_mwh * 1000) * valor_kwh_deye
@@ -265,7 +265,7 @@ with tab_cloud:
 
 # --------------------------------================================--------------
 # ABA 2: A SUA CALCULADORA ORIGINAL (TOTALMENTE PRESERVADA E INTOCADA)
-# --------------------------------================================--------------
+# ------------------------------------------------------------------------------
 with tab_calculadora:
     st.markdown("""<div class="market-header-container"><div class="market-card"><div class="market-label">💵 DÓLAR COMERCIAL</div><div class="market-value">5,1783 <span style="color: #f43f5e; font-size: 0.75rem; margin-left: 5px;">-0,28% ▼</span></div></div><div class="market-card"><div class="market-label">☀️ SOLAR INDEX GLOBAL (TAN)</div><div class="market-value">61,02 USD <span style="color: #f43f5e; font-size: 0.75rem; margin-left: 5px;">-4,03% ▼</span></div></div><div class="market-card"><div class="market-label">⚡ NEXTERA ENERGY (NEE)</div><div class="market-value">84,42 USD <span style="color: #10b981; font-size: 0.75rem; margin-left: 5px;">+0,49% ▲</span></div></div></div>""", unsafe_allow_html=True)
     st.markdown(f"""<div class="command-bar"><div>❖ SANTO HOUSE SOLAR TERMINAL v4.7 // FULL DYNAMIC ENGINE</div><div>SYS TIME: <b>{datetime.now(FUSO_BRASIL_GMT3).strftime("%d/%m/%Y %H:%M:%S")}</b></div><div style="color: #10b981; font-weight: bold; letter-spacing: 1px;">● CORE SYSTEM ONLINE</div></div>""", unsafe_allow_html=True)
