@@ -15,6 +15,12 @@ from selenium.webdriver.support import expected_conditions as EC
 # 1. Configurar página em modo super-largo (Fullscreen)
 st.set_page_config(page_title="Terminal Solar PRO", layout="wide", initial_sidebar_state="expanded")
 
+# ==============================================================================
+# CONFIGURAÇÃO INTERNA E OCULTA DA TARIFA (O investidor não vê na tela)
+# ==============================================================================
+VALOR_KWH_OCULTO = 0.85  # Modifique este valor aqui no código quando precisar alterar a tarifa
+# ==============================================================================
+
 # 2. DECLARAÇÃO DE FUNÇÕES CRÍTICAS NO TOPO (Estabilidade absoluta)
 def formato_real(valor):
     """Garante a formatação padrão BRL estrita: R$ 240.000,00"""
@@ -24,7 +30,7 @@ def formato_real(valor):
         return "R$ 0,00"
 
 def render_metric_card(label, value, color_class):
-    """Renderiza os blocks de métricas superiores com visual TradingView"""
+    """Renderiza os blocos de métricas superiores com visual TradingView"""
     st.markdown(f"""
         <div style="background-color: #131722; border: 1px solid #2a2e39; border-radius: 4px; padding: 15px; text-align: center;">
             <div style="color: #787b86; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;">{label}</div>
@@ -99,6 +105,13 @@ st.markdown("""
         border-radius: 4px 4px 0 0;
         padding: 6px 12px;
     }
+    .filter-bar {
+        background-color: #1c2030;
+        border: 1px solid #363c4e;
+        border-radius: 4px;
+        padding: 10px 15px;
+        margin-bottom: 15px;
+    }
     .neon-green { color: #10b981; text-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
     .neon-blue { color: #3b82f6; text-shadow: 0 0 10px rgba(59, 130, 246, 0.3); }
     .neon-purple { color: #ff9f43; text-shadow: 0 0 10px rgba(255, 159, 67, 0.3); }
@@ -121,7 +134,6 @@ def raspar_dados_deye(usuario, senha):
         driver.get("https://us1.deyecloud.com/login")
         wait = WebDriverWait(driver, 15)
         
-        # O robô preenche o formulário de login de forma humana automatizada
         user_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text']")))
         pass_input = driver.find_element(By.CSS_SELECTOR, "input[type='password']")
         btn_login = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
@@ -130,11 +142,9 @@ def raspar_dados_deye(usuario, senha):
         pass_input.send_keys(senha)
         btn_login.click()
         
-        # Aguarda a validação do painel de controle da Deye
         wait.until(EC.url_contains("dashboard"))
         time.sleep(4)  
         
-        # Captura os dados brutos de produção direto das caixas de métricas
         texto_producao_total = driver.find_element(By.XPATH, "//*[contains(text(), 'Produção total')]/../..//div[contains(@class, 'number')]").text
         texto_producao_mensal = driver.find_element(By.XPATH, "//*[contains(text(), 'Produção mensal')]/..//div").text
         
@@ -144,7 +154,6 @@ def raspar_dados_deye(usuario, senha):
         except:
             pass
 
-        # Converte os textos capturados do site em números limpos para o Python calcular
         total_mwh = float(''.join(c for c in texto_producao_total if c.isdigit() or c == '.'))
         mensal_mwh = float(''.join(c for c in texto_producao_mensal if c.isdigit() or c == '.'))
         atual_kw = float(''.join(c for c in texto_potencia_atual if c.isdigit() or c == '.'))
@@ -154,10 +163,9 @@ def raspar_dados_deye(usuario, senha):
 
     except Exception as e:
         driver.quit()
-        # Fallback de segurança: caso o site demore a responder, mantém o último print estável
         return 875.46, 13.89, 350.2
 
-# --- PAINEL LATERAL (CONTROLES COM LOGINS EMBUTIDOS) ---
+# --- PAINEL LATERAL (CONTROLES SEM EXIBIÇÃO DE TARIFA) ---
 try:
     side_col1, side_col2, side_col3 = st.sidebar.columns([1, 4, 1])
     with side_col2:
@@ -167,19 +175,17 @@ except:
 
 st.sidebar.markdown("<h3 style='color:#10b981; text-align:center; margin-top:5px;'>🌐 CONEXÃO TELEMETRIA LIVE</h3>", unsafe_allow_html=True)
 
-# Credenciais oficiais integradas diretamente no fluxo padrão
 deye_user = st.sidebar.text_input("Usuário Deye Cloud", value="solaralbano@gmail.com")
 deye_pass = st.sidebar.text_input("Senha de Acesso", type="password", value="oNa17112#")
-valor_kwh = st.sidebar.number_input("Valor Comercializado do kWh (R$)", value=0.85, step=0.05)
 
-# Ativação do robô assíncrono com feedback visual temporizado
+# Ativação do robô de raspagem
 with st.spinner("🔄 Sincronizando dados em tempo real com a Deye Cloud..."):
     producao_total_mwh, producao_mensal_mwh, potencia_instantanea_kw = raspar_dados_deye(deye_user, deye_pass)
 
-# Tratamento financeiro das variáveis capturadas do raspador
-faturamento_historico_real = (producao_total_mwh * 1000) * valor_kwh
-faturamento_mensal_real = (producao_mensal_mwh * 1000) * valor_kwh
-geracao_reais_por_minuto = (potencia_instantanea_kw * valor_kwh) / 60.0
+# Cálculos usando a tarifa oculta
+faturamento_historico_real = (producao_total_mwh * 1000) * VALOR_KWH_OCULTO
+faturamento_mensal_real = (producao_mensal_mwh * 1000) * VALOR_KWH_OCULTO
+geracao_reais_por_minuto = (potencia_instantanea_kw * VALOR_KWH_OCULTO) / 60.0
 
 # 5. CABEÇALHO PROPRIETÁRIO INTEGRAÇÃO DEYE CLOUD
 st.markdown(f"""
@@ -209,14 +215,10 @@ st.markdown("""
     </div>
 """.format(datetime.now(fuso_brasil).strftime("%d/%m/%Y %H:%M:%S")), unsafe_allow_html=True)
 
-# Continuidade da barra de simulação lateral
+# Configurações adicionais na barra lateral
 st.sidebar.markdown("<h3 style='color:#3b82f6; text-align:center; margin-top:5px;'>⚙️ MODELAGEM FINANCEIRA</h3>", unsafe_allow_html=True)
 
-perfil = st.sidebar.selectbox(
-    "Perfil do Investidor", 
-    ["Conservador Escalável", "Agressivo Bimestral", "Customizado"]
-)
-
+perfil = st.sidebar.selectbox("Perfil do Investidor", ["Conservador Escalável", "Agressivo Bimestral", "Customizado"])
 aporte_inicial = st.sidebar.number_input("Aporte Inicial Quitado (R$)", value=240000, step=10000)
 st.sidebar.markdown(f"<div style='color: #10b981; font-size: 0.8rem; margin-top: -12px; margin-bottom: 12px;'>➔ Validação: <b>{formato_real(aporte_inicial)}</b></div>", unsafe_allow_html=True)
 
@@ -227,29 +229,16 @@ custo_parcela_banco = st.sidebar.number_input("Parcela do Financiamento Solar (R
 st.sidebar.markdown(f"<div style='color: #e11d48; font-size: 0.8rem; margin-top: -12px; margin-bottom: 12px;'>➔ Validação: <b>{formato_real(custo_parcela_banco)}</b></div>", unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
-bandeira_aneel = st.sidebar.selectbox(
-    "Bandeira Tarifária Ativa (ANEEL)",
-    ["Verde (Tarifa Normal)", "Amarela (+ Extra)", "Vermelha P1 (Escassez)", "Vermelha P2 (Crise Máxima)"]
-)
+bandeira_aneel = st.sidebar.selectbox("Bandeira Tarifária Ativa (ANEEL)", ["Verde (Tarifa Normal)", "Amarela (+ Extra)", "Vermelha P1 (Escassez)", "Vermelha P2 (Crise Máxima)"])
 
 reajuste_anual_pct = st.sidebar.slider("Reajuste Anual da Energia / IPCA (%)", 0.0, 15.0, 5.0, step=0.5) / 100.0
-
-impacto_bandeira = {
-    "Verde (Tarifa Normal)": 1.00,
-    "Amarela (+ Extra)": 1.05,       
-    "Vermelha P1 (Escassez)": 1.12,  
-    "Vermelha P2 (Crise Máxima)": 1.20 
-}
+impacto_bandeira = {"Verde (Tarifa Normal)": 1.00, "Amarela (+ Extra)": 1.05, "Vermelha P1 (Escassez)": 1.12, "Vermelha P2 (Crise Máxima)": 1.20}
 fator_bandeira = impacto_bandeira[bandeira_aneel]
 
 faturamento_com_bandeira = faturamento_por_usina * fator_bandeira
 taxa_base_calculada = (faturamento_com_bandeira / aporte_inicial) * 100 if aporte_inicial > 0 else 0
 
-st.sidebar.metric(
-    label="📈 Rendimento Base Atualizado", 
-    value=f"{taxa_base_calculada:.2f}% ao mês", 
-    delta=f"Impacto {bandeira_aneel.split(' ')[0]}"
-)
+st.sidebar.metric(label="📈 Rendimento Base Atualizado", value=f"{taxa_base_calculada:.2f}% ao mês", delta=f"Impacto {bandeira_aneel.split(' ')[0]}")
 
 months_projection = st.sidebar.slider("Prazo da Projeção (Meses)", 12, 120, 120, step=12)
 
@@ -259,10 +248,7 @@ pct_retencao_int = 100 - pct_saque_int
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("<h4 style='color:#cbd5e1; margin-bottom: 2px;'>🎯 Alocação do Caixa</h4>", unsafe_allow_html=True)
-estrategia_caixa = st.sidebar.radio(
-    f"O que fazer com os {pct_retencao_int}% retidos?",
-    ["Acumular em Caixa Vivo (CDI)", "Quitação Acelerada (Abater Bancos)"]
-)
+estrategia_caixa = st.sidebar.radio(f"O que fazer com os {pct_retencao_int}% retidos?", ["Acumular em Caixa Vivo (CDI)", "Quitação Acelerada (Abater Bancos)"])
 
 expandir_usinas = True
 if "Conservador" in perfil:
@@ -282,7 +268,7 @@ else:
         meses_para_nova_usina = 999
         max_usinas = 1
 
-# 6. MOTOR DE CÁLCULO CORE REVISADO
+# 6. MOTOR DE CÁLCULO CORE REVISADO COM CRONOLOGIA REAL (MÊS/ANO)
 data = []
 caixa_acumulado = 0.0
 total_sacado_investidor = 0.0
@@ -295,6 +281,8 @@ val_aporte = max(1.0, float(aporte_inicial))
 val_parcela = max(0.0, float(custo_parcela_banco))
 faturamento_base_acumulado = val_faturamento
 
+data_inicial = datetime.now()
+
 for m in range(1, months_projection + 1):
     if m > 1 and (m - 1) % 12 == 0:
         faturamento_base_acumulado *= (1 + reajuste_anual_pct)
@@ -305,11 +293,7 @@ for m in range(1, months_projection + 1):
         if usinas_ativas < max_usinas:
             usinas_ativas += 1
             id_usina_atual += 1
-            financiamentos[id_usina_atual] = {
-                "parcelas_restantes": 60,
-                "primeiras_12_pagas": False,
-                "meses_sem_pagar": 0
-            }
+            financiamentos[id_usina_atual] = {"parcelas_restantes": 60, "primeiras_12_pagas": False, "meses_sem_pagar": 0}
 
     if estrategia_caixa == "Quitação Acelerada (Abater Bancos)":
         for id_u in sorted(financiamentos.keys()):
@@ -353,8 +337,15 @@ for m in range(1, months_projection + 1):
     patrimonio_ativos = usinas_ativas * val_aporte
     valor_total_holding = caixa_acumulado + patrimonio_ativos
 
+    # Geração do timestamp cronológico real para o filtro
+    data_futura = data_inicial + timedelta(days=30 * (m - 1))
+    ano_str = data_futura.strftime("%Y")
+    mes_ano_str = data_futura.strftime("%m/%Y")
+
     data.append({
-        "Mês": m,
+        "Mês Sequencial": m,
+        "Data": mes_ano_str,
+        "Ano": ano_str,
         "Usinas": usinas_ativas,
         "Faturamento Bruto": faturamento_bruto_visivel,
         "Fat. Sem Reajuste": faturamento_estatico_sem_reajuste,
@@ -364,18 +355,57 @@ for m in range(1, months_projection + 1):
         "Saque Mensal": saque_investidor,
         "Caixa Acumulado": caixa_acumulado,
         "Patrimônio Usinas": patrimonio_ativos,
-        "Valor Total Negócio": valor_total_holding
+        "Valor Total Negócio": valor_total_holding,
+        "Saque Acumulado": total_sacado_investidor
     })
 
-df = pd.DataFrame(data)
+df_completo = pd.DataFrame(data)
+
+# ==============================================================================
+# --- BARRA DE FILTRAGEM TEMPORAL DINÂMICA (Para impressionar o investidor) ---
+# ==============================================================================
+st.markdown("""<div class="panel-title-bar">📅 FILTRO CRONOLÓGICO DO PARQUE SOLAR</div>""", unsafe_allow_html=True)
+with st.container():
+    c_filtro1, c_filtro2 = st.columns([1, 3])
+    with c_filtro1:
+        tipo_filtro = st.selectbox("Modo de Visão", ["Histórico Completo", "Filtrar por Ano", "Mês Específico"])
+    
+    if tipo_filtro == "Filtrar por Ano":
+        with c_filtro2:
+            anos_disponiveis = sorted(df_completo["Ano"].unique())
+            ano_selecionado = st.selectbox("Escolha o Ano de Análise", anos_disponiveis)
+            df = df_completo[df_completo["Ano"] == ano_selecionado].copy()
+    elif tipo_filtro == "Mês Específico":
+        with c_filtro2:
+            meses_disponiveis = df_completo["Data"].unique()
+            mes_selecionado = st.selectbox("Escolha o Mês de Auditoria", meses_disponiveis)
+            df = df_completo[df_completo["Data"] == mes_selecionado].copy()
+    else:
+        df = df_completo.copy()
+
+# Ajuste de segurança caso o filtro resulte em bloco vazio
+if df.empty:
+    df = df_completo.copy()
+
+# Recálculo das variáveis de exibição com base no filtro aplicado
 retorno_solar_total = df["Valor Total Negócio"].iloc[-1]
+caixa_final_exibido = df["Caixa Acumulado"].iloc[-1]
+saque_final_exibido = df["Saque Acumulado"].iloc[-1] if tipo_filtro == "Histórico Completo" else df["Saque Mensal"].sum()
 
-# CÁLCULO DE ROI DO PAINEL 3 REALISTA
-anos_totais = months_projection / 12.0
-taxa_cdi_anual = 0.095
-retorno_cdi_final = val_aporte * ((1 + taxa_cdi_anual) ** anos_totais)
-retorno_imovel_final = val_aporte * ((1 + 0.08) ** anos_totais)
+# --- RENDERIZAÇÃO DA LINHA 1 DE BLOCOS DINÂMICOS CONFIGURADOS ---
+with st.container():
+    col_m1, col_m2, col_m3 = st.columns(3)
+    with col_m1:
+        render_metric_card(f"Caixa na Empresa ({pct_retencao_int}%)", formato_real(caixa_final_exibido), "neon-green")
+    with col_m2:
+        render_metric_card(f"Dinheiro no Bolso ({pct_saque_int}%)", formato_real(saque_final_exibido), "neon-blue")
+    with col_m3:
+        render_metric_card("Valor Total Holding (Ativos + Caixa)", formato_real(retorno_solar_total), "neon-purple")
 
+st.markdown("<br>", unsafe_allow_html=True)
+
+# --- LINHA 2: RENDIMENTOS GRÁFICOS REATIVOS ---
+row2_col1, row2_col2 = st.columns(2)
 layout_charts = dict(
     paper_bgcolor='#131722', plot_bgcolor='#131722',
     font=dict(color='#787b86', size=10),
@@ -384,37 +414,22 @@ layout_charts = dict(
     margin=dict(l=45, r=15, t=15, b=25), hovermode='x unified'
 )
 
-# --- RENDERIZAÇÃO DA LINHA 1 DE BLOCOS DINÂMICOS ---
-with st.container():
-    col_m1, col_m2, col_m3 = st.columns(3)
-    with col_m1:
-        render_metric_card(f"Caixa Livre na Empresa ({pct_retencao_int}%)", formato_real(df['Caixa Acumulado'].iloc[-1]), "neon-green")
-    with col_m2:
-        render_metric_card(f"Dinheiro Sacado para o Bolso ({pct_saque_int}%)", formato_real(total_sacado_investidor), "neon-blue")
-    with col_m3:
-        render_metric_card("Valor Total da Holding (Usinas + Caixa)", formato_real(retorno_solar_total), "neon-purple")
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# --- LINHA 2: RENDIMENTOS GRÁFICOS ---
-row2_col1, row2_col2 = st.columns(2)
-
 with row2_col1:
-    st.markdown("""<div class="panel-title-bar">📈 PAINEL 1: ESCALA PATRIMONIAL (ATIVOS VS LIQUIDEZ VS HOLDING)</div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="panel-title-bar">📈 PAINEL 1: ESCALA PATRIMONIAL NO PERÍODO</div>""", unsafe_allow_html=True)
     fig1 = go.Figure()
-    fig1.add_trace(go.Scatter(x=df["Mês"], y=df["Patrimônio Usinas"], name="Patrimônio Real", line=dict(color="#10B981", width=3), fill='tozeroy', fillcolor='rgba(16, 185, 129, 0.03)'))
-    fig1.add_trace(go.Scatter(x=df["Mês"], y=df["Caixa Acumulado"], name="Dinheiro Vivo", line=dict(color="#3B82F6", width=2, dash='dot')))
-    fig1.add_trace(go.Scatter(x=df["Mês"], y=df["Valor Total Negócio"], name="Valor da Holding", line=dict(color="#FF9F43", width=3)))
+    fig1.add_trace(go.Scatter(x=df["Data"], y=df["Patrimônio Usinas"], name="Patrimônio Real", line=dict(color="#10B981", width=3), fill='tozeroy', fillcolor='rgba(16, 185, 129, 0.03)'))
+    fig1.add_trace(go.Scatter(x=df["Data"], y=df["Caixa Acumulado"], name="Dinheiro Vivo", line=dict(color="#3B82F6", width=2, dash='dot')))
+    fig1.add_trace(go.Scatter(x=df["Data"], y=df["Valor Total Negócio"], name="Valor da Holding", line=dict(color="#FF9F43", width=3)))
     fig1.update_layout(**layout_charts, height=260)
     st.plotly_chart(fig1, use_container_width=True, config={'displayModeBar': False})
 
 with row2_col2:
-    st.markdown("""<div class="panel-title-bar">💸 PAINEL 2: FLUXO DE CAIXA MENSAL EM CASCATA</div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="panel-title-bar">💸 PAINEL 2: FLUXO DE CAIXA EM CASCATA REATIVO</div>""", unsafe_allow_html=True)
     fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(x=df["Mês"], y=df["Faturamento Bruto"], name="Fat. Reajustado", line=dict(color="#FBBF24", width=4)))
-    fig2.add_trace(go.Scatter(x=df["Mês"], y=df["Fat. Sem Reajuste"], name="Fat. Sem Reajuste", line=dict(color="#4b5563", width=1.5, dash='dash')))
-    fig2.add_trace(go.Scatter(x=df["Mês"], y=df["Lucro Líquido"], name="Lucro Líq.", line=dict(color="#A78BFA", width=2), fill='tozeroy', fillcolor='rgba(167, 139, 250, 0.01)'))
-    fig2.add_trace(go.Scatter(x=df["Mês"], y=df["Saque Mensal"], name="Seu Saque", line=dict(color="#F43F5E", width=1.5, dash='dash')))
+    fig2.add_trace(go.Scatter(x=df["Data"], y=df["Faturamento Bruto"], name="Fat. Reajustado", line=dict(color="#FBBF24", width=4)))
+    fig2.add_trace(go.Scatter(x=df["Data"], y=df["Fat. Sem Reajuste"], name="Fat. Sem Reajuste", line=dict(color="#4b5563", width=1.5, dash='dash')))
+    fig2.add_trace(go.Scatter(x=df["Data"], y=df["Lucro Líquido"], name="Lucro Líq.", line=dict(color="#A78BFA", width=2), fill='tozeroy', fillcolor='rgba(167, 139, 250, 0.01)'))
+    fig2.add_trace(go.Scatter(x=df["Data"], y=df["Saque Mensal"], name="Seu Saque", line=dict(color="#F43F5E", width=1.5, dash='dash')))
     fig2.update_layout(**layout_charts, height=260)
     st.plotly_chart(fig2, use_container_width=True, config={'displayModeBar': False})
 
@@ -422,46 +437,40 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # --- LINHA 3: COMPARATIVO EM JUROS COMPOSTOS E INSIGHTS ---
 row3_col1, row3_col2 = st.columns([1.2, 1])
+anos_totais = months_projection / 12.0
+taxa_cdi_anual = 0.095
+retorno_cdi_final = val_aporte * ((1 + taxa_cdi_anual) ** anos_totais)
+retorno_imovel_final = val_aporte * ((1 + 0.08) ** anos_totais)
 
 with row3_col1:
     st.markdown("""<div class="panel-title-bar">🏛️ PAINEL 3: DESTRUIÇÃO DE ALTERNATIVAS DO MERCADO</div>""", unsafe_allow_html=True)
     fig3 = go.Figure(go.Bar(
-        x=[retorno_solar_total, retorno_cdi_final, retorno_imovel_final],
+        x=[df_completo["Valor Total Negócio"].iloc[-1], retorno_cdi_final, retorno_imovel_final],
         y=["Império Solar", "Renda Fixa (CDI)", "Imóvel Físico"],
         orientation='h',
         marker_color=['#10B981', '#334155', '#1e293b']
     ))
-    fig3.update_layout(
-        paper_bgcolor='#131722', plot_bgcolor='#131722',
-        font=dict(color='#787b86', size=10),
-        xaxis=dict(showgrid=True, gridcolor='#2a2e39'),
-        yaxis=dict(showgrid=False),
-        margin=dict(l=10, r=15, t=15, b=15), height=160
-    )
+    fig3.update_layout(paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#787b86', size=10), xaxis=dict(showgrid=True, gridcolor='#2a2e39'), yaxis=dict(showgrid=False), margin=dict(l=10, r=15, t=15, b=15), height=160)
     st.plotly_chart(fig3, use_container_width=True, config={'displayModeBar': False})
 
 with row3_col2:
     st.markdown("""<div class="panel-title-bar">📝 INSIGHT ESTRATÉGICO PARA O PITCH</div>""", unsafe_allow_html=True)
-    multiplicador = retorno_solar_total / (retorno_cdi_final if retorno_cdi_final > 0 else 1)
+    multiplicador = df_completo["Valor Total Negócio"].iloc[-1] / (retorno_cdi_final if retorno_cdi_final > 0 else 1)
     st.markdown(f"""
         <div style="background-color: #131722; border: 1px solid #2a2e39; border-radius: 0 0 4px 4px; padding: 20px; height: 160px; font-size: 0.85rem; color: #cbd5e1; line-height: 1.5;">
-            Ao adotar a estratégia selecionada, o capital injetado se multiplica de forma geométrica através do efeito caixa livre. 
+            Ao adotar a estratégia selecionada, o capital injetado se multiplica através do efeito caixa livre. 
             Enquanto as aplicações tradicionais prendem o investidor em uma linha reta corroída pela inflação, o modelo operacional 
-            solar entrega um retorno total estimado de <b style="color:#10b981;">{multiplicador:.1f}x maior que o CDI</b>, capitalizando a tarifa reajustada em patrimônio líquido consolidado.
+            solar entrega um retorno total estimado de <b style="color:#10b981;">{multiplicador:.1f}x maior que o CDI</b>, capitalizando a tarifa em patrimônio consolidado.
         </div>
     """, unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- LINHA 4: TABELA DE AUDITORIA COMPLETA ---
-st.markdown("""<div class="panel-title-bar">📋 TABELA DE AUDITORIA DO TERMINAL (MÊS A MÊS)</div>""", unsafe_allow_html=True)
+# --- LINHA 4: TABELA DE AUDITORIA FILTRADA ---
+st.markdown("""<div class="panel-title-bar">📋 TABELA DE AUDITORIA DO TERMINAL (VISÃO TEMPORAL AJUSTADA)</div>""", unsafe_allow_html=True)
 st.dataframe(df.style.format({
-    "Faturamento Bruto": formato_real,
-    "Fat. Sem Reajuste": formato_real,
-    "Parcelas Banco": formato_real,
-    "Lucro Líquido": formato_real,
-    "Saque Mensal": formato_real,
-    "Caixa Acumulado": formato_real,
-    "Patrimônio Usinas": formato_real,
-    "Valor Total Negócio": formato_real
+    "Faturamento Bruto": formato_real, "Fat. Sem Reajuste": formato_real,
+    "Parcelas Banco": formato_real, "Lucro Líquido": formato_real,
+    "Saque Mensal": formato_real, "Caixa Acumulado": formato_real,
+    "Patrimônio Usinas": formato_real, "Valor Total Negócio": formato_real
 }), use_container_width=True, height=250, hide_index=True)
