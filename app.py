@@ -27,13 +27,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ LAB DE ENGENHARIA E DIAGNÓSTICO SOLAR v1.1")
+st.title("⚡ LAB DE ENGENHARIA E DIAGNÓSTICO SOLAR v1.2")
 st.markdown("---")
 
 col1, col2 = st.columns([1, 2])
 with col1:
     canal_alvo = st.selectbox("Escolha a Integradora para Validar:", list(DADOS_CONEXAO.keys()))
-    tempo_aguardo = st.slider("Tempo de Carregamento da Página (segundos)", 3, 15, 8)
+    tempo_aguardo = st.slider("Tempo de Carregamento da Página (segundos)", 3, 20, 10)
     botao_iniciar = st.button("🚀 INICIAR CAPTURA DE TELEMETRIA EM LIVE", use_container_width=True)
 
 def inicializar_driver_antidetect():
@@ -70,75 +70,84 @@ if botao_iniciar:
             wait = WebDriverWait(driver, 15)
             print_log(f"Conectado com sucesso em: {creds['url']}")
 
-            status_placeholder.warning("🔄 Passo 2: Injetando Credenciais com Proteção de Visibilidade...")
+            status_placeholder.warning("🔄 Passo 2: Forçando bypass e injeção direta de dados...")
             
             if "Solarman" in canal_alvo:
-                u_in = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@type='text' or @placeholder='Account' or @placeholder='E-mail']")))
-                p_in = driver.find_element(By.XPATH, "//input[@type='password']")
-                u_in.send_keys(creds["user"])
-                p_in.send_keys(creds["pass"])
+                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//form//input[@type='text']")))
+                p_in = driver.find_element(By.XPATH, "//form//input[@type='password']")
+                driver.execute_script("arguments[0].value = arguments[1];", u_in, creds["user"])
+                driver.execute_script("arguments[0].value = arguments[1];", p_in, creds["pass"])
                 btn = driver.find_element(By.XPATH, "//button[@type='submit' or contains(text(), 'Login')]")
                 driver.execute_script("arguments[0].click();", btn)
                 
             elif "ShineMonitor" in canal_alvo:
-                u_in = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@id='username' or @id='email']")))
-                p_in = driver.find_element(By.XPATH, "//input[@id='password']")
-                u_in.send_keys(creds["user"])
-                p_in.send_keys(creds["pass"])
-                btn = driver.find_element(By.XPATH, "//*[@id='login_btn' or @type='submit']")
+                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@id, 'username') or contains(@id, 'email')]")))
+                p_in = driver.find_element(By.XPATH, "//input[contains(@id, 'password')]")
+                driver.execute_script("arguments[0].value = arguments[1];", u_in, creds["user"])
+                driver.execute_script("arguments[0].value = arguments[1];", p_in, creds["pass"])
+                btn = driver.find_element(By.XPATH, "//*[contains(@id, 'login') or @type='submit']")
                 driver.execute_script("arguments[0].click();", btn)
 
             elif "Hopewind" in canal_alvo:
-                u_in = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[contains(@placeholder, 'Account') or contains(@placeholder, 'username')]")))
+                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@placeholder, 'Account')]")))
                 p_in = driver.find_element(By.XPATH, "//input[@type='password']")
-                u_in.send_keys(creds["user"])
-                p_in.send_keys(creds["pass"])
+                driver.execute_script("arguments[0].value = arguments[1];", u_in, creds["user"])
+                driver.execute_script("arguments[0].value = arguments[1];", p_in, creds["pass"])
+                
+                # CRÍTICO: Força o clique na caixinha de aceite dos termos da Hopewind antes de logar
+                try:
+                    checkbox_termos = driver.find_element(By.XPATH, "//input[@type='checkbox'] or [contains(@class, 'checkbox')]")
+                    driver.execute_script("arguments[0].click();", checkbox_termos)
+                    print_log("Caixa de Termos e Privacidade aceita via JS.")
+                except:
+                    pass
+                
                 btn = driver.find_element(By.XPATH, "//button[contains(@class, 'el-button--primary') or @type='button']")
                 driver.execute_script("arguments[0].click();", btn)
 
             elif "Growatt" in canal_alvo:
-                u_in = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@id='val_login_account' or @name='username']")))
-                p_in = driver.find_element(By.XPATH, "//input[@id='val_login_pwd' or @name='password']")
-                u_in.send_keys(creds["user"])
-                p_in.send_keys(creds["pass"])
-                btn = driver.find_element(By.XPATH, "//*[contains(@class, 'btn-login') or @type='submit']")
+                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@id, 'account') or @name='username']")))
+                p_in = driver.find_element(By.XPATH, "//input[contains(@id, 'pwd') or @name='password']")
+                driver.execute_script("arguments[0].value = arguments[1];", u_in, creds["user"])
+                driver.execute_script("arguments[0].value = arguments[1];", p_in, creds["pass"])
+                btn = driver.find_element(By.XPATH, "//*[contains(@class, 'login') or @type='submit']")
                 driver.execute_script("arguments[0].click();", btn)
 
             elif "Hoymiles" in canal_alvo:
-                u_in = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@type='text']")))
+                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='text']")))
                 p_in = driver.find_element(By.XPATH, "//input[@type='password']")
-                u_in.send_keys(creds["user"])
-                p_in.send_keys(creds["pass"])
+                driver.execute_script("arguments[0].value = arguments[1];", u_in, creds["user"])
+                driver.execute_script("arguments[0].value = arguments[1];", p_in, creds["pass"])
                 btn = driver.find_element(By.CLASS_NAME, "ant-btn-primary")
                 driver.execute_script("arguments[0].click();", btn)
 
             elif "FoxESS" in canal_alvo:
-                u_in = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@id='username' or @placeholder='Username']")))
-                p_in = driver.find_element(By.XPATH, "//input[@id='password' or @placeholder='Password']")
-                u_in.send_keys(creds["user"])
-                p_in.send_keys(creds["pass"])
-                btn = driver.find_element(By.XPATH, "//*[contains(@class, 'login-btn') or @type='button']")
+                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@id, 'user') or @placeholder='Username']")))
+                p_in = driver.find_element(By.XPATH, "//input[contains(@id, 'pass') or @placeholder='Password']")
+                driver.execute_script("arguments[0].value = arguments[1];", u_in, creds["user"])
+                driver.execute_script("arguments[0].value = arguments[1];", p_in, creds["pass"])
+                btn = driver.find_element(By.XPATH, "//*[contains(@class, 'login') or @type='button']")
                 driver.execute_script("arguments[0].click();", btn)
 
             elif "Fronius" in canal_alvo:
-                u_in = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@id='username' or @name='username']")))
-                p_in = driver.find_element(By.XPATH, "//input[@id='password' or @name='password']")
-                u_in.send_keys(creds["user"])
-                p_in.send_keys(creds["pass"])
-                btn = driver.find_element(By.XPATH, "//button[@id='login-btn' or @type='submit']")
+                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@id, 'user') or @name='username']")))
+                p_in = driver.find_element(By.XPATH, "//input[contains(@id, 'pass') or @name='password']")
+                driver.execute_script("arguments[0].value = arguments[1];", u_in, creds["user"])
+                driver.execute_script("arguments[0].value = arguments[1];", p_in, creds["pass"])
+                btn = driver.find_element(By.XPATH, "//*[contains(@id, 'login') or @type='submit']")
                 driver.execute_script("arguments[0].click();", btn)
 
-            print_log("Formulário submetido via Engine JavaScript Bypass.")
-            status_placeholder.warning(f"🔄 Passo 3: Aguardando estabilização dos scripts ({tempo_aguardo}s)...")
+            print_log("Payload de autenticação forçado na memória da página.")
+            status_placeholder.warning(f"🔄 Passo 3: Aguardando processamento interno ({tempo_aguardo}s)...")
             time.sleep(tempo_aguardo)
 
-            print_log(f"URL Atual após processamento: {driver.current_url}")
+            print_log(f"URL Atual pós-login: {driver.current_url}")
             
-            status_placeholder.warning("🔄 Passo 4: Coletando árvore de elementos...")
+            status_placeholder.warning("🔄 Passo 4: Mapeando árvore de telemetria...")
             corpo_pagina_texto = driver.find_element(By.TAG_NAME, "body").text
             
             st.markdown("### 📄 Texto Cru Detectado na Tela Logada:")
-            st.text_area("Analise a saída abaixo:", value=corpo_pagina_texto, height=250)
+            st.text_area("Dados extraídos da sessão ativa:", value=corpo_pagina_texto, height=250)
             
             status_placeholder.success("✅ Processo Concluído com Sucesso!")
             driver.quit()
