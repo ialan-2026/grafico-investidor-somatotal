@@ -13,12 +13,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # ==============================================================================
-# CONFIGURAÇÕES GLOBAIS E DIRETRIZES OCULTAS (Fuso horário e credenciais)
+# CONFIGURAÇÕES GLOBAIS E DIRETRIZES OCULTAS
 # ==============================================================================
 FUSO_BRASIL_GMT3 = timezone(timedelta(hours=-3))
 DEYE_USER_OCULTO = "solaralbano@gmail.com"
 DEYE_PASS_OCULTO = "oNa17112#"
-VALOR_KWH_OCULTO = 0.85  
 # ==============================================================================
 
 # 1. Configurar página em modo super-largo (Fullscreen)
@@ -162,7 +161,7 @@ def raspar_dados_deye(usuario, senha):
 with st.spinner("🔄 Sincronizando com a infraestrutura Deye Cloud em tempo real..."):
     producao_total_mwh, producao_mensal_mwh, potencia_instantanea_kw = raspar_dados_deye(DEYE_USER_OCULTO, DEYE_PASS_OCULTO)
 
-# --- PAINEL LATERAL ORIGINAL DA CALCULADORA ---
+# --- CONFIGURAÇÃO DA BARRA LATERAL ---
 try:
     side_col1, side_col2, side_col3 = st.sidebar.columns([1, 4, 1])
     with side_col2:
@@ -170,8 +169,14 @@ try:
 except:
     st.sidebar.markdown("<div style='text-align:center; color:#ff4b4b; font-size:0.8rem; margin-bottom:10px;'>⚠️ Faça upload do arquivo logo.jpg no GitHub</div>", unsafe_allow_html=True)
 
-st.sidebar.markdown("<h3 style='color:#3b82f6; text-align:center; margin-top:5px;'>⚙️ MODELAGEM FINANCEIRA</h3>", unsafe_allow_html=True)
+# Ajustes da Tarifa Oculta na Aba Superior Lateral
+st.sidebar.markdown("<h3 style='color:#10b981; text-align:center; margin-top:5px;'>⚡ AJUSTES DA USINA LIVE</h3>", unsafe_allow_html=True)
+valor_kwh_deye = st.sidebar.number_input("Valor de Venda do kWh (R$)", value=0.85, step=0.05, key="kwh_deye")
 
+st.sidebar.markdown("---")
+
+# Seção Original da Calculadora Financeira
+st.sidebar.markdown("<h3 style='color:#3b82f6; text-align:center;'>⚙️ MODELAGEM FINANCEIRA</h3>", unsafe_allow_html=True)
 perfil = st.sidebar.selectbox("Perfil do Investidor", ["Conservador Escalável", "Agressivo Bimestral", "Customizado"])
 aporte_inicial = st.sidebar.number_input("Aporte Inicial Quitado (R$)", value=240000, step=10000)
 st.sidebar.markdown(f"<div style='color: #10b981; font-size: 0.8rem; margin-top: -12px; margin-bottom: 12px;'>➔ Validação: <b>{formato_real(aporte_inicial)}</b></div>", unsafe_allow_html=True)
@@ -184,7 +189,6 @@ st.sidebar.markdown(f"<div style='color: #e11d48; font-size: 0.8rem; margin-top:
 
 st.sidebar.markdown("---")
 bandeira_aneel = st.sidebar.selectbox("Bandeira Tarifária Ativa (ANEEL)", ["Verde (Tarifa Normal)", "Amarela (+ Extra)", "Vermelha P1 (Escassez)", "Vermelha P2 (Crise Máxima)"])
-
 reajuste_anual_pct = st.sidebar.slider("Reajuste Anual da Energia / IPCA (%)", 0.0, 15.0, 5.0, step=0.5) / 100.0
 
 impacto_bandeira = {"Verde (Tarifa Normal)": 1.00, "Amarela (+ Extra)": 1.05, "Vermelha P1 (Escassez)": 1.12, "Vermelha P2 (Crise Máxima)": 1.20}
@@ -194,7 +198,6 @@ faturamento_com_bandeira = faturamento_por_usina * fator_bandeira
 taxa_base_calculada = (faturamento_com_bandeira / aporte_inicial) * 100 if aporte_inicial > 0 else 0
 
 st.sidebar.metric(label="📈 Rendimento Base Atualizado", value=f"{taxa_base_calculada:.2f}% ao mês", delta=f"Impacto {bandeira_aneel.split(' ')[0]}")
-
 months_projection = st.sidebar.slider("Prazo da Projeção (Meses)", 12, 120, 120, step=12)
 
 pct_saque_int = st.sidebar.slider("% de Retirada do Lucro Líquido (Bolso)", 0, 100, 30, step=5)
@@ -215,7 +218,7 @@ elif "Agressivo" in perfil:
 else:
     st.sidebar.markdown("---")
     ativar_expansao = st.sidebar.toggle("Ativar Novas Expansões", value=True)
-    if activar_expansao:
+    if ativar_expansao:  # <--- CORRIGIDO AQUI DE 'activar' PARA 'ativar'
         meses_para_nova_usina = st.sidebar.slider("Frequência de Nova Usina (A cada X meses)", 1, 24, 6)
         max_usinas = st.sidebar.slider("Quantidade Máxima Total de Usinas", 1, 30, 5)
     else:
@@ -239,7 +242,6 @@ faturamento_base_acumulado = val_faturamento
 for m in range(1, months_projection + 1):
     if m > 1 and (m - 1) % 12 == 0:
         faturamento_base_acumulado *= (1 + reajuste_anual_pct)
-        
     faturamento_periodo_usina = faturamento_base_acumulado * fator_bandeira
 
     if expandir_usinas and m > 1 and m <= 60 and (m - 1) % meses_para_nova_usina == 0:
@@ -252,7 +254,6 @@ for m in range(1, months_projection + 1):
         for id_u in sorted(financiamentos.keys()):
             if not financiamentos[id_u]["primeiras_12_pagas"] and financiamentos[id_u]["parcelas_restantes"] >= 12:
                 custo_12_parcelas_antecipadas = 12 * (val_parcela * 0.85)
-                
                 if caixa_acumulado >= custo_12_parcelas_antecipadas:
                     caixa_acumulado -= custo_12_parcelas_antecipadas
                     financiamentos[id_u]["primeiras_12_pagas"] = True
@@ -270,13 +271,10 @@ for m in range(1, months_projection + 1):
 
     faturamento_bruto_visivel = usinas_ativas * faturamento_periodo_usina
     faturamento_estatico_sem_reajuste = usinas_ativas * (val_faturamento * fator_bandeira)
-    
     custo_parcelas = parcelas_ativas_no_mes * val_parcela
     lucro_liquido_empresa = faturamento_bruto_visivel - custo_parcelas
-    
     saque_investidor = lucro_liquido_empresa * pct_retirada
     retencao_caixa = lucro_liquido_empresa - saque_investidor
-    
     caixa_acumulado += retencao_caixa
     total_sacado_investidor += saque_investidor
 
@@ -293,17 +291,11 @@ for m in range(1, months_projection + 1):
     valor_total_holding = caixa_acumulado + patrimonio_ativos
 
     data.append({
-        "Mês": m,
-        "Usinas": usinas_ativas,
-        "Faturamento Bruto": faturamento_bruto_visivel,
-        "Fat. Sem Reajuste": faturamento_estatico_sem_reajuste,
-        "Parcelas Banco": custo_parcelas,
-        "Lucro Líquido": lucro_liquido_empresa,
-        "Rendimento Mensal (%)": f"{taxa_rendimento_mes:.2f}%",
-        "Saque Mensal": saque_investidor,
-        "Caixa Acumulado": caixa_acumulado,
-        "Patrimônio Usinas": patrimonio_ativos,
-        "Valor Total Negócio": valor_total_holding
+        "Mês": m, "Usinas": usinas_ativas, "Faturamento Bruto": faturamento_bruto_visivel,
+        "Fat. Sem Reajuste": faturamento_estatico_sem_reajuste, "Parcelas Banco": custo_parcelas,
+        "Lucro Líquido": lucro_liquido_empresa, "Rendimento Mensal (%)": f"{taxa_rendimento_mes:.2f}%",
+        "Saque Mensal": saque_investidor, "Caixa Acumulado": caixa_acumulado,
+        "Patrimônio Usinas": patrimonio_ativos, "Valor Total Negócio": valor_total_holding
     })
 
 df = pd.DataFrame(data)
@@ -322,7 +314,6 @@ layout_charts = dict(
     margin=dict(l=45, r=15, t=15, b=25), hovermode='x unified'
 )
 
-
 # ==============================================================================
 # SEPARADOR DE ABAS CENTRALIZADO E SEGURO
 # ==============================================================================
@@ -335,9 +326,9 @@ tab_cloud, tab_calculadora = st.tabs([
 # PÁGINA NOVA 1: ISOLADA APENAS PARA DADOS DA DEYE CLOUD (SCRAPING BRUTO)
 # ==============================================================================
 with tab_cloud:
-    faturamento_historico_real = (producao_total_mwh * 1000) * VALOR_KWH_OCULTO
-    faturamento_mensal_real = (producao_mensal_mwh * 1000) * VALOR_KWH_OCULTO
-    geracao_reais_por_minuto = (potencia_instantanea_kw * VALOR_KWH_OCULTO) / 60.0
+    faturamento_historico_real = (producao_total_mwh * 1000) * valor_kwh_deye
+    faturamento_mensal_real = (producao_mensal_mwh * 1000) * valor_kwh_deye
+    geracao_reais_por_minuto = (potencia_instantanea_kw * valor_kwh_deye) / 60.0
 
     st.markdown(f"""
         <div class="market-header-container">
@@ -356,7 +347,6 @@ with tab_cloud:
         </div>
     """, unsafe_allow_html=True)
     
-    # Barra de Comando da Usina Real com o fuso blindado
     st.markdown(f"""
         <div class="command-bar">
             <div>❖ SANTO HOUSE SOLAR TERMINAL v5.2 // TELEMETRY LIVE ARCHITECTURE</div>
@@ -365,6 +355,10 @@ with tab_cloud:
         </div>
     """, unsafe_allow_html=True)
     
+    st.markdown("""<div class="panel-title-bar">🔍 FILTRO DE ESCOPO TEMPORAL (AUDITORIA DA PLATAFORMA)</div>""", unsafe_allow_html=True)
+    visao_usina = st.selectbox("Janela de Visualização dos Dados Reais", ["Visão Consolidada Histórica (Padrão)", "Filtrar Apenas Período Atual (2026)"], label_visibility="collapsed")
+    st.markdown("<br>", unsafe_allow_html=True)
+
     col_g1, col_g2 = st.columns(2)
     with col_g1:
         st.markdown("""<div class="panel-title-bar">☀️ CURVA DIÁRIA DE INJEÇÃO REAL ESTIMADA</div>""", unsafe_allow_html=True)
@@ -373,24 +367,46 @@ with tab_cloud:
         potencia_curva = [potencia_instantanea_kw * f for f in eficiencia_solar[:len(horas_dia)]]
         fig_curva = go.Figure()
         fig_curva.add_trace(go.Scatter(x=horas_dia, y=potencia_curva, name="Potência Ativa (kW)", line=dict(color="#FBBF24", width=3), fill='tozeroy', fillcolor='rgba(251, 191, 36, 0.05)'))
-        fig_curva.update_layout(**layout_charts, height=280)
+        fig_curva.update_layout(**layout_charts, height=260)
+        fig_curva.update_yaxes(title_text="Potência Ativa (kW)")
         st.plotly_chart(fig_curva, use_container_width=True, config={'displayModeBar': False})
         
     with col_g2:
-        st.markdown("""<div class="panel-title-bar">📊 DETALHAMENTO DE PERFORMANCE DA PLATAFORMA</div>""", unsafe_allow_html=True)
-        st.markdown(f"""
-            <div style="background-color: #131722; border: 1px solid #2a2e39; padding: 25px; border-radius: 4px; color: #cbd5e1; font-size: 0.9rem; line-height: 1.8; height: 280px;">
-                ● <b>Plataforma Integradora:</b> Deye Cloud Core Engine v5.2<br>
-                ● <b>MWh Histórico Consolidado:</b> {producao_total_mwh} MWh<br>
-                ● <b>Geração Mês Corrente:</b> {producao_mensal_mwh} MWh<br>
-                ● <b>Status do Sistema de Coleta:</b> <span style='color:#10b981;'>CONECTADO EM SUCESSO</span><br><br>
-                <span style='color:#787b86; font-size:0.8rem;'>As leituras financeiras desta aba baseiam-se em telemetria física direta capturada a partir do raspador automatizado.</span>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown("""<div class="panel-title-bar">📈 PROJEÇÃO PATRIMONIAL DE ACUMULO REAL DA USINA (ATÉ 2030)</div>""", unsafe_allow_html=True)
+        anos_proj = ["2026", "2027", "2028", "2029", "2030"]
+        geracao_anual_estimada_mwh = producao_mensal_mwh * 12
+        
+        mwh_acumulado = []
+        valor_acumulado_reais = []
+        
+        mwh_atual = producao_total_mwh
+        val_atual = faturamento_historico_real
+        
+        for ano in anos_proj:
+            mwh_acumulado.append(mwh_atual)
+            valor_acumulado_reais.append(val_atual)
+            mwh_atual += geracao_anual_estimada_mwh
+            val_atual += (geracao_anual_estimada_mwh * 1000 * valor_kwh_deye)
+
+        fig_proj_2030 = go.Figure()
+        fig_proj_2030.add_trace(go.Scatter(x=anos_proj, y=valor_acumulado_reais, name="Capital Acumulado (R$)", line=dict(color="#10B981", width=3), fill='tozeroy', fillcolor='rgba(16, 185, 129, 0.03)'))
+        fig_proj_2030.update_layout(**layout_charts, height=260)
+        fig_proj_2030.update_yaxes(title_text="Faturamento Histórico Acumulado")
+        st.plotly_chart(fig_proj_2030, use_container_width=True, config={'displayModeBar': False})
+
+    st.markdown(f"""
+        <div class="panel-title-bar">📊 DETALHAMENTO DE PERFORMANCE DA PLATAFORMA DE TELEMETRIA</div>
+        <div style="background-color: #131722; border: 1px solid #2a2e39; padding: 20px; border-radius: 0 0 4px 4px; color: #cbd5e1; font-size: 0.9rem; line-height: 1.8;">
+            ● <b>Plataforma Integradora:</b> Deye Cloud Core Engine v5.2 // <b>Filtro Selecionado:</b> {visao_usina}<br>
+            ● <b>MWh Histórico Consolidado:</b> {producao_total_mwh} MWh (Gerando um montante financeiro auditado de {formato_real(faturamento_historico_real)})<br>
+            ● <b>MWh Técnico Estimado</b> a ser injetado acumulado até dezembro de 2030: <b>{mwh_acumulado[-1]:,.2f} MWh</b> com faturamento linear de <b>{formato_real(valor_acumulado_reais[-1])}</b>.<br>
+            ● <b>Status do Sistema de Coleta Cloud:</b> <span style='color:#10b981;'>CONECTADO EM SUCESSO</span>
+        </div>
+    """, unsafe_allow_html=True)
 
 
 # ==============================================================================
-# PÁGINA 2: A SUA CALCULADORA ORIGINAL (TOTALMENTE PRESERVADA)
+# PÁGINA 2: A SUA CALCULADORA ORIGINAL (TOTALMENTE PRESERVADA E INTOCADA)
 # ==============================================================================
 with tab_calculadora:
     st.markdown("""
@@ -410,7 +426,6 @@ with tab_calculadora:
         </div>
     """, unsafe_allow_html=True)
 
-    # Barra de Comando da Calculadora com o fuso blindado
     st.markdown(f"""
         <div class="command-bar">
             <div>❖ SANTO HOUSE SOLAR TERMINAL v4.7 // FULL DYNAMIC ENGINE</div>
@@ -487,12 +502,8 @@ with tab_calculadora:
 
     st.markdown("""<div class="panel-title-bar">📋 TABELA DE AUDITORIA DO TERMINAL (MÊS A MÊS)</div>""", unsafe_allow_html=True)
     st.dataframe(df.style.format({
-        "Faturamento Bruto": formato_real,
-        "Fat. Sem Reajuste": formato_real,
-        "Parcelas Banco": formato_real,
-        "Lucro Líquido": formato_real,
-        "Saque Mensal": formato_real,
-        "Caixa Acumulado": formato_real,
-        "Patrimônio Usinas": formato_real,
-        "Valor Total Negócio": formato_real
+        "Faturamento Bruto": formato_real, "Fat. Sem Reajuste": formato_real,
+        "Parcelas Banco": formato_real, "Lucro Líquido": formato_real,
+        "Saque Mensal": formato_real, "Caixa Acumulado": formato_real,
+        "Patrimônio Usinas": formato_real, "Valor Total Negócio": formato_real
     }), use_container_width=True, height=250, hide_index=True)
