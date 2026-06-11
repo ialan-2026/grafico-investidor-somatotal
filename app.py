@@ -108,23 +108,12 @@ def extrair_solarman(creds):
         driver.quit()
         return 0.007, 672.6, 13.9, 875.47 
 
-def extrair_shinemonitor(creds):
-    return 0.12, 120.4, 2.4, 150.32
-
-def extrair_hopewind(creds):
-    return 0.05, 85.2, 1.1, 92.45
-
-def extrair_growatt(creds):
-    return 0.22, 230.1, 4.8, 310.12
-
-def extrair_hoymiles(creds):
-    return 0.08, 92.4, 1.9, 114.50
-
-def extrair_foxess(creds):
-    return 0.15, 140.3, 3.1, 185.60
-
-def extrair_fronius(creds):
-    return 0.31, 310.8, 6.2, 420.15
+def extrair_shinemonitor(creds): return 0.12, 120.4, 2.4, 150.32
+def extrair_hopewind(creds): return 0.05, 85.2, 1.1, 92.45
+def extrair_growatt(creds): return 0.22, 230.1, 4.8, 310.12
+def extrair_hoymiles(creds): return 0.08, 92.4, 1.9, 114.50
+def extrair_foxess(creds): return 0.15, 140.3, 3.1, 185.60
+def extrair_fronius(creds): return 0.31, 310.8, 6.2, 420.15
 
 
 # ENGINE DE PARALELISMO ASSÍNCRONO
@@ -218,6 +207,13 @@ for m in range(1, months_projection + 1):
 
 df = pd.DataFrame(data)
 
+# --- CORREÇÃO ABSOLUTA: CÁLCULO DE JURE COMPOSTOS PARA O PAINEL 3 ---
+anos_totais = months_projection / 12.0
+taxa_cdi_anual = 0.095
+retorno_cdi_final = val_aporte * ((1 + taxa_cdi_anual) ** anos_totais)
+retorno_imovel_final = val_aporte * ((1 + 0.08) ** anos_totais)
+
+
 # ==============================================================================
 # SEPARADOR DE ABAS (PÁGINAS ISOLADAS DE EXIBIÇÃO)
 # ==============================================================================
@@ -263,7 +259,7 @@ with tab_cloud:
 
     st.markdown(f"""<div class="panel-title-bar">📊 DETALHAMENTO DE PERFORMANCE DA PLATAFORMA DE TELEMETRIA UNIFICADA</div><div style="background-color: #131722; border: 1px solid #2a2e39; padding: 20px; border-radius: 0 0 4px 4px; color: #cbd5e1; font-size: 0.9rem; line-height: 1.8;">● <b>Plataforma Integradora:</b> White-Label Solar Aggregator v5.5 (7 Portais Ativos)<br>● <b>MWh Histórico Consolidado (Geral):</b> {total_mwh:,.2f} MWh (Montante financeiro gerado: {formato_real(fat_historico_real)})<br>● <b>Volume Técnico Estimado</b> acumulado até dezembro de 2030: <b>{m_m:,.2f} MWh</b> com retorno linear de <b>{formato_real(v_acum[-1])}</b>.<br>● <b>Status da Conexão dos Servidores:</b> <span style='color:#10b981;'>TODOS OS 7 CANAIS OPERANDO COM SUCESSO</span></div>""", unsafe_allow_html=True)
 
-# --------------------------------================================--------------
+# --------------------------------================------------------------------
 # ABA 2: A SUA CALCULADORA ORIGINAL (TOTALMENTE PRESERVADA E INTOCADA)
 # ------------------------------------------------------------------------------
 with tab_calculadora:
