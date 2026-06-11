@@ -12,16 +12,17 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# 1. Configurar página em modo super-largo (Fullscreen)
-st.set_page_config(page_title="Terminal Solar PRO", layout="wide", initial_sidebar_state="expanded")
-
 # ==============================================================================
-# CREDENCIAIS E DIRETRIZES OCULTAS DE TELEMETRIA
+# CONFIGURAÇÕES GLOBAIS E DIRETRIZES OCULTAS (Fuso horário e credenciais)
 # ==============================================================================
+FUSO_BRASIL_GMT3 = timezone(timedelta(hours=-3))
 DEYE_USER_OCULTO = "solaralbano@gmail.com"
 DEYE_PASS_OCULTO = "oNa17112#"
 VALOR_KWH_OCULTO = 0.85  
 # ==============================================================================
+
+# 1. Configurar página em modo super-largo (Fullscreen)
+st.set_page_config(page_title="Terminal Solar PRO", layout="wide", initial_sidebar_state="expanded")
 
 # 2. DECLARAÇÃO DE FUNÇÕES CRÍTICAS NO TOPO (Estabilidade absoluta)
 def formato_real(valor):
@@ -113,7 +114,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 4. MOTOR DO ROBÔ DE SCRAPING INVISÍVEL (EXECUTADO EM SEGUNDO PLANO)
+# 4. MOTOR DO ROBÔ DE SCRAPING INVISÍVEL
 @st.cache_data(ttl=300)
 def raspar_dados_deye(usuario, senha):
     chrome_options = Options()
@@ -158,7 +159,7 @@ def raspar_dados_deye(usuario, senha):
         return 875.46, 13.89, 350.2
 
 # Execução assíncrona do robô de raspagem
-with st.spinner("🔄 Conectando aos sistemas de telemetria em tempo real..."):
+with st.spinner("🔄 Sincronizando com a infraestrutura Deye Cloud em tempo real..."):
     producao_total_mwh, producao_mensal_mwh, potencia_instantanea_kw = raspar_dados_deye(DEYE_USER_OCULTO, DEYE_PASS_OCULTO)
 
 # --- PAINEL LATERAL ORIGINAL DA CALCULADORA ---
@@ -222,7 +223,7 @@ else:
         meses_para_nova_usina = 999
         max_usinas = 1
 
-# --- MOTOR DE CÁLCULO CORE ORIGINAL (SEM NENHUMA ALTERAÇÃO) ---
+# --- MOTOR DE CÁLCULO CORE ORIGINAL ---
 data = []
 caixa_acumulado = 0.0
 total_sacado_investidor = 0.0
@@ -323,7 +324,7 @@ layout_charts = dict(
 
 
 # ==============================================================================
-# STRUCTURE DEFINITION: SISTEMA MULTI-PÁGINAS LIMPO (ABAS)
+# SEPARADOR DE ABAS CENTRALIZADO E SEGURO
 # ==============================================================================
 tab_cloud, tab_calculadora = st.tabs([
     "⚡ USINA EM TEMPO REAL (DEYE CLOUD)",
@@ -334,7 +335,6 @@ tab_cloud, tab_calculadora = st.tabs([
 # PÁGINA NOVA 1: ISOLADA APENAS PARA DADOS DA DEYE CLOUD (SCRAPING BRUTO)
 # ==============================================================================
 with tab_cloud:
-    # Cabeçalho da Deye convertendo MWh para Real baseado na Tarifa Oculta
     faturamento_historico_real = (producao_total_mwh * 1000) * VALOR_KWH_OCULTO
     faturamento_mensal_real = (producao_mensal_mwh * 1000) * VALOR_KWH_OCULTO
     geracao_reais_por_minuto = (potencia_instantanea_kw * VALOR_KWH_OCULTO) / 60.0
@@ -356,7 +356,15 @@ with tab_cloud:
         </div>
     """, unsafe_allow_html=True)
     
-    # Renderização de gráficos técnicos exclusivos da planta real
+    # Barra de Comando da Usina Real com o fuso blindado
+    st.markdown(f"""
+        <div class="command-bar">
+            <div>❖ SANTO HOUSE SOLAR TERMINAL v5.2 // TELEMETRY LIVE ARCHITECTURE</div>
+            <div>SYS TIME: <b>{datetime.now(FUSO_BRASIL_GMT3).strftime("%d/%m/%Y %H:%M:%S")}</b></div>
+            <div style="color: #10b981; font-weight: bold; letter-spacing: 1px;">● LIVE PROCESSING ACTIVE</div>
+        </div>
+    """, unsafe_allow_html=True)
+    
     col_g1, col_g2 = st.columns(2)
     with col_g1:
         st.markdown("""<div class="panel-title-bar">☀️ CURVA DIÁRIA DE INJEÇÃO REAL ESTIMADA</div>""", unsafe_allow_html=True)
@@ -382,10 +390,9 @@ with tab_cloud:
 
 
 # ==============================================================================
-# PÁGINA 2: A SUA CALCULADORA ORIGINAL (TOTALMENTE INALTERADA)
+# PÁGINA 2: A SUA CALCULADORA ORIGINAL (TOTALMENTE PRESERVADA)
 # ==============================================================================
 with tab_calculadora:
-    # 4. CABEÇALHO PROPRIETÁRIO SANTO HOUSE ORIGINAL
     st.markdown("""
         <div class="market-header-container">
             <div class="market-card">
@@ -403,16 +410,15 @@ with tab_calculadora:
         </div>
     """, unsafe_allow_html=True)
 
-    # --- BARRA DE COMANDO INTEGRADA ORIGINAL ---
-    st.markdown("""
+    # Barra de Comando da Calculadora com o fuso blindado
+    st.markdown(f"""
         <div class="command-bar">
             <div>❖ SANTO HOUSE SOLAR TERMINAL v4.7 // FULL DYNAMIC ENGINE</div>
-            <div>SYS TIME: <b>{}</b></div>
+            <div>SYS TIME: <b>{datetime.now(FUSO_BRASIL_GMT3).strftime("%d/%m/%Y %H:%M:%S")}</b></div>
             <div style="color: #10b981; font-weight: bold; letter-spacing: 1px;">● CORE SYSTEM ONLINE</div>
         </div>
-    """.format(datetime.now(fuso_brasil).strftime("%d/%m/%Y %H:%M:%S")), unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-    # --- RENDERIZAÇÃO DA LINHA 1 COM TÍTULOS ORIGINAIS ---
     with st.container():
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1:
@@ -424,7 +430,6 @@ with tab_calculadora:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- LINHA 2: GRÁFICOS ORIGINAIS COM ESCALA DE MÊS (1 A 120) ---
     row2_col1, row2_col2 = st.columns(2)
 
     with row2_col1:
@@ -448,7 +453,6 @@ with tab_calculadora:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- LINHA 3: COMPARATIVO ORIGINAL EM JUROS COMPOSTOS ---
     row3_col1, row3_col2 = st.columns([1.2, 1])
 
     with row3_col1:
@@ -481,7 +485,6 @@ with tab_calculadora:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- LINHA 4: TABELA MÊS A MÊS ORIGINAL ---
     st.markdown("""<div class="panel-title-bar">📋 TABELA DE AUDITORIA DO TERMINAL (MÊS A MÊS)</div>""", unsafe_allow_html=True)
     st.dataframe(df.style.format({
         "Faturamento Bruto": formato_real,
