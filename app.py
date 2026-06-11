@@ -27,7 +27,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ LAB DE ENGENHARIA E DIAGNÓSTICO SOLAR v1.3")
+st.title("⚡ LAB DE ENGENHARIA E DIAGNÓSTICO SOLAR v1.4")
 st.markdown("---")
 
 col1, col2 = st.columns([1, 2])
@@ -64,13 +64,25 @@ if botao_iniciar:
             "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         })
 
-        # FUNÇÃO CRÍTICA: Força o input do navegador disparando os gatilhos dos frameworks React/Vue/Angular
-        def forcar_preenchimento(elemento, valor):
+        # SOLUÇÃO DEFINITIVA PARA BYPASS DE VUE/REACT/ANGULAR STATE
+        def forcar_input_framework(elemento, valor):
             driver.execute_script("""
-                arguments[0].value = arguments[1];
-                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
-                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
-                arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
+                var el = arguments[0];
+                var val = arguments[1];
+                var setter = Object.getOwnPropertyDescriptor(el.__proto__, 'value')?.set;
+                var prototype = Object.getPrototypeOf(el);
+                var prototypeSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+                
+                if (setter && setter !== prototypeSetter) {
+                    prototypeSetter.call(el, val);
+                } else if (setter) {
+                    setter.call(el, val);
+                } else {
+                    el.value = val;
+                }
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.dispatchEvent(new Event('blur', { bubbles: true }));
             """, elemento, valor)
 
         try:
@@ -79,42 +91,42 @@ if botao_iniciar:
             wait = WebDriverWait(driver, 15)
             print_log(f"Conectado com sucesso em: {creds['url']}")
 
-            status_placeholder.warning("🔄 Passo 2: Injetando Payload com Emulação de Eventos Nativos...")
+            status_placeholder.warning("🔄 Passo 2: Perfurando Validação do Estado do Framework...")
             
             if "Solarman" in canal_alvo:
-                # Filtragem estrita para pegar o input que está visível de verdade na tela desktop
-                inputs = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//input[@type='text']")))
-                u_in = [i for i in inputs if i.is_displayed()][0]
+                # Localiza todos os inputs e filtra apenas o que está visível no container de login
+                inputs_user = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//input[@type='text' or @placeholder='Account' or @placeholder='E-mail']")))
+                u_in = [i for i in inputs_user if i.is_displayed()][0]
                 p_in = driver.find_element(By.XPATH, "//input[@type='password']")
                 
-                forcar_preenchimento(u_in, creds["user"])
-                forcar_preenchimento(p_in, creds["pass"])
+                forcar_input_framework(u_in, creds["user"])
+                forcar_input_framework(p_in, creds["pass"])
                 
-                btn = driver.find_element(By.XPATH, "//button[@type='submit' or contains(text(), 'Login')]")
+                btn = driver.find_element(By.XPATH, "//button[@type='submit' or contains(@class, 'login-btn') or contains(text(), 'Login')]")
                 driver.execute_script("arguments[0].click();", btn)
                 
             elif "ShineMonitor" in canal_alvo:
-                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@id, 'username') or contains(@id, 'email') or @type='text']")))
-                p_in = driver.find_element(By.XPATH, "//input[contains(@id, 'password') or @type='password']")
+                u_in = wait.until(EC.presence_of_element_located((By.ID, "username")))
+                p_in = driver.find_element(By.ID, "password")
                 
-                forcar_preenchimento(u_in, creds["user"])
-                forcar_preenchimento(p_in, creds["pass"])
+                forcar_input_framework(u_in, creds["user"])
+                forcar_input_framework(p_in, creds["pass"])
                 
-                btn = driver.find_element(By.XPATH, "//*[contains(@id, 'login') or @type='submit' or contains(@class, 'btn')]")
+                btn = driver.find_element(By.ID, "login_btn")
                 driver.execute_script("arguments[0].click();", btn)
 
             elif "Hopewind" in canal_alvo:
                 u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@placeholder, 'Account')]")))
                 p_in = driver.find_element(By.XPATH, "//input[@type='password']")
                 
-                forcar_preenchimento(u_in, creds["user"])
-                forcar_preenchimento(p_in, creds["pass"])
+                forcar_input_framework(u_in, creds["user"])
+                forcar_input_framework(p_in, creds["pass"])
                 
-                # Clique forçado no checkbox oculto de politicas da Hopewind
+                # Forçar o clique na caixinha de politicas ocultas da Hopewind antes de enviar
                 try:
-                    checkbox_termos = driver.find_element(By.XPATH, "//input[@type='checkbox'] or //span[contains(@class, 'checkbox')]")
+                    checkbox_termos = driver.find_element(By.XPATH, "//input[@type='checkbox'] or //span[contains(@class, 'checkbox__inner')]")
                     driver.execute_script("arguments[0].click();", checkbox_termos)
-                    print_log("Gatilho de Aceite de Privacidade acionado via JS.")
+                    print_log("Checkbox de Aceite de Privacidade acionado.")
                 except:
                     pass
                 
@@ -122,46 +134,46 @@ if botao_iniciar:
                 driver.execute_script("arguments[0].click();", btn)
 
             elif "Growatt" in canal_alvo:
-                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@id='username' or @id='val_login_account' or @name='username']")))
-                p_in = driver.find_element(By.XPATH, "//input[@id='password' or @id='val_login_pwd' or @name='password']")
+                u_in = wait.until(EC.presence_of_element_located((By.ID, "val_login_account")))
+                p_in = driver.find_element(By.ID, "val_login_pwd")
                 
-                forcar_preenchimento(u_in, creds["user"])
-                forcar_preenchimento(p_in, creds["pass"])
+                forcar_input_framework(u_in, creds["user"])
+                forcar_input_framework(p_in, creds["pass"])
                 
-                btn = driver.find_element(By.XPATH, "//*[contains(@class, 'login') or @type='submit']")
+                btn = driver.find_element(By.CLASS_NAME, "btn-login")
                 driver.execute_script("arguments[0].click();", btn)
 
             elif "Hoymiles" in canal_alvo:
                 u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='text']")))
                 p_in = driver.find_element(By.XPATH, "//input[@type='password']")
                 
-                forcar_preenchimento(u_in, creds["user"])
-                forcar_preenchimento(p_in, creds["pass"])
+                forcar_input_framework(u_in, creds["user"])
+                forcar_input_framework(p_in, creds["pass"])
                 
                 btn = driver.find_element(By.CLASS_NAME, "ant-btn-primary")
                 driver.execute_script("arguments[0].click();", btn)
 
             elif "FoxESS" in canal_alvo:
-                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@id, 'user') or @placeholder='Username' or @type='text']")))
-                p_in = driver.find_element(By.XPATH, "//input[contains(@id, 'pass') or @placeholder='Password' or @type='password']")
+                u_in = wait.until(EC.presence_of_element_located((By.ID, "username")))
+                p_in = driver.find_element(By.ID, "password")
                 
-                forcar_preenchimento(u_in, creds["user"])
-                forcar_preenchimento(p_in, creds["pass"])
+                forcar_input_framework(u_in, creds["user"])
+                forcar_input_framework(p_in, creds["pass"])
                 
-                btn = driver.find_element(By.XPATH, "//*[contains(@class, 'login') or @type='button' or @type='submit']")
+                btn = driver.find_element(By.CLASS_NAME, "login-btn")
                 driver.execute_script("arguments[0].click();", btn)
 
             elif "Fronius" in canal_alvo:
-                u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@id='username' or @name='username' or @type='text']")))
-                p_in = driver.find_element(By.XPATH, "//input[@id='password' or @name='password' or @type='password']")
+                u_in = wait.until(EC.presence_of_element_located((By.ID, "username")))
+                p_in = driver.find_element(By.ID, "password")
                 
-                forcar_preenchimento(u_in, creds["user"])
-                forcar_preenchimento(p_in, creds["pass"])
+                forcar_input_framework(u_in, creds["user"])
+                forcar_input_framework(p_in, creds["pass"])
                 
-                btn = driver.find_element(By.XPATH, "//*[contains(@id, 'login') or @type='submit']")
+                btn = driver.find_element(By.ID, "login-btn")
                 driver.execute_script("arguments[0].click();", btn)
 
-            print_log("Payload injetado e disparado com sincronismo de Virtual DOM.")
+            print_log("Gatilhos de estado injetados com sucesso via Prototype Engine.")
             status_placeholder.warning(f"🔄 Passo 3: Aguardando processamento e redirecionamento ({tempo_aguardo}s)...")
             time.sleep(tempo_aguardo)
 
