@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 import re
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -35,21 +36,20 @@ col1, col2 = st.columns([1, 2])
 with col1:
     canal_alvo = st.selectbox("Escolha a Integradora para Validar:", list(DADOS_CONEXAO.keys()))
     tempo_aguardo = st.slider("Tempo de Carregamento da Página (segundos)", 3, 15, 6)
-    executar = st.button("🚀 INICIAR CAPTURA DE TELEMETRIA EM LIVE", use_container_width=True)
+    botao_iniciar = st.button("🚀 INICIAR CAPTURA DE TELEMETRIA EM LIVE", use_container_width=True)
 
-# Função centralizada com flags de evasão de detecção de robôs
+# Função de evasão de robôs para ambiente cloud
 def inicializar_driver_antidetect():
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
-    # Tira o carimbo de robô que o Chrome Headless deixa nos servidores
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
     options.add_argument("--disable-blink-features=AutomationControlled")
     return webdriver.Chrome(options=options)
 
-if ejecutar:
+if botao_iniciar:
     creds = DADOS_CONEXAO[canal_alvo]
     logs = []
     
@@ -63,7 +63,6 @@ if ejecutar:
             console_placeholder.code("\n".join(logs))
 
         driver = inicializar_driver_antidetect()
-        # Executa script para apagar vestígios de automação que acionam Cloudflare/Captchas
         driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
             "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         })
@@ -76,7 +75,7 @@ if ejecutar:
 
             status_placeholder.warning("🔄 Passo 2: Tentando Injetar Credenciais...")
             
-            # --- BLOCOS CONDICIONAIS DE LOGIN POR INTEGRATOR ---
+            # --- FLUXO DE LOGIN POR CANAL ---
             if "Solarman" in canal_alvo:
                 u_in = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text']")))
                 p_in = driver.find_element(By.CSS_SELECTOR, "input[type='password']")
@@ -130,12 +129,10 @@ if ejecutar:
             status_placeholder.warning(f"🔄 Passo 3: Aguardando janela de segurança ({tempo_aguardo}s)...")
             time.sleep(tempo_aguardo)
 
-            # Validação pós-login
             print_log(f"URL Atual após o envio do Login: {driver.current_url}")
             
             status_placeholder.warning("🔄 Passo 4: Tentando Ler Árvore de Elementos (HTML)...")
-            # Salva o texto cru visível da tela inteira para sabermos se entramos no painel de gráficos
-            corpo_pagina_texto = driver.find_element(By.TAG_BODY).text
+            corpo_pagina_texto = driver.find_element(By.TAG_NAME, "body").text
             
             st.markdown("### 📄 Texto Cru Detectado na Tela Logada:")
             st.text_area("Use esta caixa para caçar palavras como 'Today', 'MWh' ou 'Total' para calibrar seus XPATHs:", value=corpo_pagina_texto, height=250)
