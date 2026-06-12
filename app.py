@@ -10,12 +10,15 @@ from selenium.webdriver.support import expected_conditions as EC
 
 st.set_page_config(page_title="Engenharia de Telemetria Solar", layout="wide")
 
-# Lista EXCLUSIVA apenas com os 4 canais que você pediu e que funcionam
+# Mantidos os 7 canais conforme exibido no seu painel real
 DADOS_CONEXAO = {
+    "Canal 01 (Solarman/Deye)": {"url": "https://pro.solarmanpv.com/login", "user": "solaralbano@gmail.com", "pass": "mBA4rvnSMuc5", "tipo": "solarman"},
     "Canal 02 (ShineMonitor)": {"url": "https://www.shinemonitor.com/", "user": "Albano Solar", "pass": "oNa17112#", "tipo": "shinemonitor"},
     "Canal 03 (Hopewind)": {"url": "https://hopewindcloud.eu/#/login", "user": "solaralbano@gmail.com", "pass": "oNa17112", "tipo": "hopewind"},
+    "Canal 04 (Growatt)": {"url": "https://oss.growatt.com/login?lang=en", "user": "EBBJQA001", "pass": "Solarjob123", "tipo": "growatt"},
     "Canal 05 (Hoymiles)": {"url": "https://global.hoymiles.com/website", "user": "solarjob", "pass": "Solarjob@123", "tipo": "hoymiles"},
-    "Canal 06 (FoxESS)": {"url": "https://www.foxesscloud.com/v2/login", "user": "solarjob", "pass": "Solarjob@123", "tipo": "foxess"}
+    "Canal 06 (FoxESS)": {"url": "https://www.foxesscloud.com/v2/login", "user": "solarjob", "pass": "Solarjob@123", "tipo": "foxess"},
+    "Canal 07 (Fronius)": {"url": "https://login.fronius.com/authenticationendpoint/login.do?client_id=mf_o9iTAyKemNLQTa6Sp6HYonCIa", "user": "engenharia@solarjob.com.br", "pass": "Solarjob@1234", "tipo": "fronius"}
 }
 
 st.markdown("""
@@ -34,7 +37,7 @@ st.title("⚡ LAB DE ENGENHARIA E TELEMETRIA CÍCLICA v1.7")
 st.markdown("---")
 
 if "historico_leituras" not in st.session_state:
-    st.session_state.historico_leituras = {k: {"potencia": "- W", "diaria": "- kWh", "mensal": "- MWh", "total": "- MWh", "status": "Aguardando Varredura", "timestamp": "-"} for k in DADOS_CONEXAO.keys()}
+    st.session_state.historico_leituras = {k: {"potencia": "- W", "diaria": "- kWh", "mensal": "- MWh", "total": "- MWh", "status": "Aguardando Inicialização", "timestamp": "-"} for k in DADOS_CONEXAO.keys()}
 
 if "current_index" not in st.session_state:
     st.session_state.current_index = 0
@@ -78,7 +81,6 @@ with col2:
             <th>SINCRO</th>
         </tr>"""
     
-    # Exibe SEMPRE as usinas fixas para o painel nunca parecer quebrado ou vazio
     for canal, dados in st.session_state.historico_leituras.items():
         if "ONLINE" in dados["status"]: cor_status = "badge-ok"
         elif "FALHA" in dados["status"]: cor_status = "badge-err"
@@ -98,9 +100,16 @@ with col2:
 
     console_placeholder = st.empty()
 
-# --- ENGINE DO LOOP INFINITO DA FILA CIRCULAR ---
+# ==============================================================================
+# ENGINE DO LOOP INFINITO CO CORREÇÃO EXTRA DE INDICE (LINE 105)
+# ==============================================================================
 if loop_ativo:
     lista_canais = list(DADOS_CONEXAO.keys())
+    
+    # PROTEÇÃO CRÍTICA ANTIDERRAPAGEM: Força o índice a voltar para 0 caso mude o tamanho da lista
+    if st.session_state.current_index >= len(lista_canais):
+        st.session_state.current_index = 0
+        
     idx_atual = st.session_state.current_index
     canal_alvo = lista_canais[idx_atual]
     
@@ -125,7 +134,16 @@ if loop_ativo:
         driver.get(creds["url"])
         wait = WebDriverWait(driver, 15)
 
-        if creds["tipo"] == "shinemonitor":
+        if creds["tipo"] == "solarman":
+            inputs = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//input[@type='text']")))
+            u_in = [i for i in inputs if i.is_displayed()][0]
+            p_in = driver.find_element(By.XPATH, "//input[@type='password']")
+            forcar_preenchimento(u_in, creds["user"])
+            forcar_preenchimento(p_in, creds["pass"])
+            btn = driver.find_element(By.XPATH, "//button[@type='submit' or contains(text(), 'Login')]")
+            driver.execute_script("arguments[0].click();", btn)
+
+        elif creds["tipo"] == "shinemonitor":
             u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@id, 'username') or @type='text']")))
             p_in = driver.find_element(By.XPATH, "//input[contains(@id, 'password') or @type='password']")
             forcar_preenchimento(u_in, creds["user"])
@@ -145,6 +163,14 @@ if loop_ativo:
             btn = driver.find_element(By.XPATH, "//button[contains(@class, 'el-button--primary') or @type='button']")
             driver.execute_script("arguments[0].click();", btn)
 
+        elif creds["tipo"] == "growatt":
+            u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@id='username' or @id='val_login_account' or @name='username']")))
+            p_in = driver.find_element(By.XPATH, "//input[@id='password' or @id='val_login_pwd' or @name='password']")
+            forcar_preenchimento(u_in, creds["user"])
+            forcar_preenchimento(p_in, creds["pass"])
+            btn = driver.find_element(By.XPATH, "//*[contains(@class, 'login') or @type='submit']")
+            driver.execute_script("arguments[0].click();", btn)
+
         elif creds["tipo"] == "hoymiles":
             u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='text']")))
             p_in = driver.find_element(By.XPATH, "//input[@type='password']")
@@ -161,17 +187,36 @@ if loop_ativo:
             btn = driver.find_element(By.XPATH, "//*[contains(@class, 'login') or @type='button' or @type='submit']")
             driver.execute_script("arguments[0].click();", btn)
 
+        elif creds["tipo"] == "fronius":
+            u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@id='username' or @name='username' or @type='text']")))
+            p_in = driver.find_element(By.XPATH, "//input[@id='password' or @name='password' or @type='password']")
+            forcar_preenchimento(u_in, creds["user"])
+            forcar_preenchimento(p_in, creds["pass"])
+            btn = driver.find_element(By.XPATH, "//*[contains(@id, 'login') or @type='submit']")
+            driver.execute_script("arguments[0].click();", btn)
+
         time.sleep(tempo_estabilizacao)
         corpo_texto = driver.find_element(By.TAG_NAME, "body").text
         
-        if "Forgot Password" in corpo_texto or "Remember Me" in corpo_texto or "Sign Up" in corpo_texto:
-            raise Exception("Login rejeitado ou retido na tela inicial.")
+        # Ignora falsos positivos se cair na tela inicial
+        if "Forgot Password" in corpo_texto or "Forgot user/password" in corpo_texto:
+            raise Exception("Retido na tela de login.")
 
-        pot, dia, mes, tot = "- W", "- kWh", "- MWh", "- MWh"
+        pot, dia, mes, tot = "0 W", "0 kWh", "0 MWh", "0 MWh"
         
-        if creds["tipo"] == "hoymiles":
-            mes = extrair_valor_regex(r"This month\s*\n\s*([\d.]+)\s*MWh", corpo_texto, "-") + " MWh"
-            tot = extrair_valor_regex(r"Lifetime\s*\n\s*([\d.]+)\s*(?:GWh|MWh)", corpo_texto, "-") + " GWh"
+        if creds["tipo"] == "solarman":
+            linhas = corpo_texto.split('\n')
+            for i, linha in enumerate(linhas):
+                if "tempo real" in linha and i+1 < len(linhas): pot = linhas[i+1]
+                if "diária" in linha and i+1 < len(linhas): dia = linhas[i+1]
+                if "mensal" in linha and i+1 < len(linhas): mes = linhas[i+1]
+                if "total" in linha and i+1 < len(linhas): tot = linhas[i+1]
+        elif creds["tipo"] == "hoymiles":
+            # Capturas cirúrgicas isoladas baseadas no seu padrão textual real
+            pot = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*W)", corpo_texto, "0 W")
+            dia = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*kWh)", corpo_texto, "0 kWh")
+            mes = extrair_valor_regex(r"([\d.]+)\s*MWh", corpo_texto, "0") + " MWh"
+            tot = extrair_valor_regex(r"([\d.]+)\s*GWh", corpo_texto, "0") + " GWh"
         else:
             pot = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*(?:kW|W|MW))", corpo_texto, "- W")
             dia = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*kWh)", corpo_texto, "- kWh")
@@ -189,6 +234,8 @@ if loop_ativo:
         st.session_state.historico_leituras[canal_alvo]["timestamp"] = datetime.now().strftime("%H:%M:%S")
         driver.quit()
 
+    # Move a fila circular perpétua de forma 100% segura
     st.session_state.current_index = (idx_atual + 1) % len(lista_canais)
+    
     time.sleep(intervalo_loop)
     st.rerun()
