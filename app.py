@@ -19,8 +19,8 @@ DADOS_CONEXAO = {
         "user": "solaralbano@gmail.com", "pass": "oNa17112", "tipo": "json_payload"
     },
     "Canal 04 (Growatt)": {
-        "url_login": "https://server.growatt.com/LoginAPI.do", 
-        "user": "EBBJQA001", "pass": "Solarjob123", "tipo": "form_payload"
+        "url_login": "https://server.growatt.com/login.do", # Endpoint de produção corrigido
+        "user": "EBBJQA001", "pass": "Solarjob123", "tipo": "growatt_payload"
     },
     "Canal 05 (Hoymiles)": {
         "url_login": "https://global.hoymiles.com/iam/api/login", 
@@ -31,7 +31,7 @@ DADOS_CONEXAO = {
         "user": "solarjob", "pass": "Solarjob@123", "tipo": "json_payload"
     },
     "Canal 07 (Fronius)": {
-        "url_login": "https://login.fronius.com/authenticationendpoint/login.do?client_id=mf_o9iTAyKemNLQTa6Sp6HYonCIa", 
+        "url_login": "https://login.fronius.com/oauth2/token", 
         "user": "engenharia@solarjob.com.br", "pass": "Solarjob@1234", "tipo": "oauth_payload"
     }
 }
@@ -48,7 +48,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ LAB DE TELEMETRIA SOLAR v2.1 (BACKGROUND API ENGINE)")
+st.title("⚡ LAB DE TELEMETRIA SOLAR v2.2 (API CALIBRATION)")
 st.markdown("---")
 
 if "historico_api" not in st.session_state:
@@ -78,6 +78,7 @@ with col2:
     
     for canal, dados in st.session_state.historico_api.items():
         cor_status = "badge-ok" if "ONLINE" in dados["status"] else ("badge-err" if "FALHA" in dados["status"] else "badge-process")
+        
         html_tabela += f"""<tr>
             <td><b>{canal}</b></td>
             <td><code>{dados['status_http']}</code></td>
@@ -105,47 +106,50 @@ if loop_ativo:
     
     session = requests.Session()
     
-    # Cabeçalhos padrão emulando requisições vindas de um App Mobile real
     headers_padrao = {
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
-        "Accept": "application/json, text/plain, */*",
-        "X-Requested-With": "com.hoymiles.inverter" if "Hoymiles" in canal_alvo else "XMLHttpRequest"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*"
     }
     session.headers.update(headers_padrao)
 
     try:
-        # Tratamento individualizado baseado nas assinaturas de segurança coletadas no print v2.0
         if creds["tipo"] == "json_payload":
             payload = {"username": creds["user"], "password": creds["pass"]}
             response = session.post(creds["url_login"], json=payload, timeout=8)
             
         elif creds["tipo"] == "hoymiles_payload":
-            # Formato de payload estrito exigido pelo gateway da Hoymiles Cloud
             payload = {"user_name": creds["user"], "password": creds["pass"], "language": "en_US"}
             response = session.post(creds["url_login"], json=payload, timeout=8)
             
+        elif creds["tipo"] == "growatt_payload":
+            # CORREÇÃO GROWATT: Mapeado os parametros exatos esperados pelo server corporativo
+            payload = {"account": creds["user"], "password": creds["pass"], "validateCode": ""}
+            response = session.post(creds["url_login"], data=payload, timeout=8)
+            
         elif creds["tipo"] == "oauth_payload":
-            # CORREÇÃO FRONIUS: Injeta o grant_type solicitado pelo servidor de autenticação no print
+            # CORREÇÃO OAUTH: Enviando o grant_type no corpo do form urlencoded conforme solicitado
             headers_oauth = {"Content-Type": "application/x-www-form-urlencoded"}
             payload = {
                 "grant_type": "password",
                 "username": creds["user"],
-                "password": creds["pass"],
-                "scope": "openid"
+                "password": creds["pass"]
             }
             response = session.post(creds["url_login"], data=payload, headers=headers_oauth, timeout=8)
             
-        else: # form_payload (Growatt e ShineMonitor)
-            payload = {"userName": creds["user"], "password": creds["pass"]}
+        else: # form_payload standard
+            payload = {"username": creds["user"], "password": creds["pass"]}
             response = session.post(creds["url_login"], data=payload, timeout=8)
 
         codigo_http = response.status_code
         resposta_texto = response.text.strip()
 
+        # Validador estrito contra falsos positivos de páginas de login HTML
+        status_real = "🟢 ONLINE (LIVE)" if codigo_http in [200, 201] and "html" not in response.headers.get("Content-Type", "") else "🔴 ENDPOINT RETIDO"
+
         st.session_state.historico_api[canal_alvo] = {
             "status_http": str(codigo_http),
-            "dados_brutos": resposta_texto if resposta_texto else "Conexão Estabelecida com Sucesso",
-            "status": "🟢 ONLINE (LIVE)" if codigo_http in [200, 201] else "🔴 RESPOSTA REJEITADA",
+            "dados_brutos": resposta_texto if resposta_texto else "Resposta de Sessão Ativa Vazia",
+            "status": status_real,
             "timestamp": datetime.now().strftime("%H:%M:%S")
         }
 
