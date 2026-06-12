@@ -37,7 +37,7 @@ st.sidebar.markdown("<h3 style='color:#10b981; text-align:center;'>⚙️ CONFIG
 VALOR_KWH = st.sidebar.number_input("Valor do kWh Comercializado (R$)", value=0.50, step=0.01, min_value=0.01)
 st.sidebar.markdown("---")
 
-ENERGIA_DIARIA_ALVA = 14000.0  # Capacidade nominal fixa do parque comercial
+ENERGIA_DIARIA_ALVA = 14000.0  # Geração nominal do parque completo
 
 def render_metric_card(label, value, subtext, color_class):
     st.markdown(f"""
@@ -49,7 +49,7 @@ def render_metric_card(label, value, subtext, color_class):
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# ALGORITMO DE GERAÇÃO SOLAR DINÂMICA COM REPASSE INTEGRAL
+# ENGINE ALGORÍTMICO SOLAR COM INTEGRAÇÃO DE TARIFA DINÂMICA
 # ==============================================================================
 hora_decimal = agora.hour + (agora.minute / 60.0) + (agora.second / 3600.0)
 ruido_live = random.uniform(0.98, 1.02)
@@ -63,7 +63,6 @@ else:
     potencia_live_kw = 0.0
     energia_hoje_kwh = ENERGIA_DIARIA_ALVA if hora_decimal > 18.0 else 0.0
 
-# Cálculos Consolidados Dinâmicos
 faturamento_hoje_total = energia_hoje_kwh * VALOR_KWH
 
 dias_passados_junho = agora.day - 1
@@ -77,7 +76,7 @@ faturamento_anual_2026_realizado = faturamento_jan_mai + faturamento_mes_acumula
 energia_anual_mwh_realizado = (energia_jan_mai_kwh / 1000.0) + energia_mes_total_mwh
 
 # ==============================================================================
-# PAINEL DE METRICAS PRINCIPAIS - CORRIGIDO PARA EXATAMENTE 3 CABEÇALHOS
+# PAINEL SUPERIOR: ALINHAMENTO FIXO DE 3 COLUNAS
 # ==============================================================================
 col_c1, col_c2, col_c3 = st.columns(3)
 with col_c1:
@@ -90,9 +89,9 @@ with col_c3:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==============================================================================
-# QUADRO CENTRAL DAS USINAS OPERACIONAIS
+# QUADRO CENTRAL TOTALMENTE REBRANDEADO CONFORME MANIFESTO
 # ==============================================================================
-st.markdown("""<div class="panel-title-bar">🌐 CENTRAL DE GERENCIAMENTO DE ATIVOS: PARQUE FOTOVOLTAICO ATIVO</div>""", unsafe_allow_html=True)
+st.markdown("""<div class="panel-title-bar">🌐 GESTÃO OPERACIONAL DE CRÉDITO DE ENERGIA LIMPA</div>""", unsafe_allow_html=True)
 
 distribuicao_usinas = [
     {"nome": "Usina Solar Alvorada Premium", "peso": 0.28, "historico": 452.1},
@@ -138,7 +137,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- RENDERIZAÇÃO DOS GRÁFICOS REAL-TIME ---
+# --- RENDERIZAÇÃO DOS GRÁFICOS COMPORTAMENTAIS ---
 col_g1, col_g2 = st.columns(2)
 
 with col_g1:
