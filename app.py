@@ -49,7 +49,7 @@ def render_metric_card(label, value, subtext, color_class):
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# ENGINE ALGORÍTMICO SOLAR COM INTEGRAÇÃO DE TARIFA DINÂMICA
+# ALGORITMO SOLAR DINÂMICO
 # ==============================================================================
 hora_decimal = agora.hour + (agora.minute / 60.0) + (agora.second / 3600.0)
 ruido_live = random.uniform(0.98, 1.02)
@@ -76,7 +76,7 @@ faturamento_anual_2026_realizado = faturamento_jan_mai + faturamento_mes_acumula
 energia_anual_mwh_realizado = (energia_jan_mai_kwh / 1000.0) + energia_mes_total_mwh
 
 # ==============================================================================
-# PAINEL SUPERIOR: ALINHAMENTO FIXO DE 3 COLUNAS
+# PAINEL SUPERIOR: EXATAMENTE 3 COLUNAS FIXAS NO TOPO
 # ==============================================================================
 col_c1, col_c2, col_c3 = st.columns(3)
 with col_c1:
@@ -89,7 +89,7 @@ with col_c3:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==============================================================================
-# QUADRO CENTRAL TOTALMENTE REBRANDEADO CONFORME MANIFESTO
+# TABELA PRINCIPAL OPERACIONAL
 # ==============================================================================
 st.markdown("""<div class="panel-title-bar">🌐 GESTÃO OPERACIONAL DE CRÉDITO DE ENERGIA LIMPA</div>""", unsafe_allow_html=True)
 
@@ -137,7 +137,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- RENDERIZAÇÃO DOS GRÁFICOS COMPORTAMENTAIS ---
+# --- RENDERIZAÇÃO DOS GRÁFICOS REAL-TIME ---
 col_g1, col_g2 = st.columns(2)
 
 with col_g1:
