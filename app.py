@@ -10,7 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 st.set_page_config(page_title="Engenharia de Telemetria Solar", layout="wide")
 
-# Mantidos os 7 canais conforme exibido no seu painel real
+# Banco de dados completo com os 7 canais mapeados no seu painel real
 DADOS_CONEXAO = {
     "Canal 01 (Solarman/Deye)": {"url": "https://pro.solarmanpv.com/login", "user": "solaralbano@gmail.com", "pass": "mBA4rvnSMuc5", "tipo": "solarman"},
     "Canal 02 (ShineMonitor)": {"url": "https://www.shinemonitor.com/", "user": "Albano Solar", "pass": "oNa17112#", "tipo": "shinemonitor"},
@@ -33,13 +33,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ LAB DE ENGENHARIA E TELEMETRIA CÍCLICA v1.7")
+st.title("⚡ LAB DE ENGENHARIA E TELEMETRIA CÍCLICA v1.8")
 st.markdown("---")
 
 if "historico_leituras" not in st.session_state:
     st.session_state.historico_leituras = {k: {"potencia": "- W", "diaria": "- kWh", "mensal": "- MWh", "total": "- MWh", "status": "Aguardando Inicialização", "timestamp": "-"} for k in DADOS_CONEXAO.keys()}
 
-if "current_index" not in st.session_state:
+lista_canais = list(DADOS_CONEXAO.keys())
+
+# ==============================================================================
+# 🛡️ TRAVA ABSOLUTA ANTI-INDEXERROR (CORRIGE O BUG DA LINHA 105)
+# ==============================================================================
+if "current_index" not in st.session_state or st.session_state.current_index >= len(lista_canais) or st.session_state.current_index < 0:
     st.session_state.current_index = 0
 
 col1, col2 = st.columns([1, 2])
@@ -100,16 +105,8 @@ with col2:
 
     console_placeholder = st.empty()
 
-# ==============================================================================
-# ENGINE DO LOOP INFINITO CO CORREÇÃO EXTRA DE INDICE (LINE 105)
-# ==============================================================================
+# --- MOTOR FLUIDO DA MÁQUINA DE ESTADO ---
 if loop_ativo:
-    lista_canais = list(DADOS_CONEXAO.keys())
-    
-    # PROTEÇÃO CRÍTICA ANTIDERRAPAGEM: Força o índice a voltar para 0 caso mude o tamanho da lista
-    if st.session_state.current_index >= len(lista_canais):
-        st.session_state.current_index = 0
-        
     idx_atual = st.session_state.current_index
     canal_alvo = lista_canais[idx_atual]
     
@@ -198,9 +195,8 @@ if loop_ativo:
         time.sleep(tempo_estabilizacao)
         corpo_texto = driver.find_element(By.TAG_NAME, "body").text
         
-        # Ignora falsos positivos se cair na tela inicial
         if "Forgot Password" in corpo_texto or "Forgot user/password" in corpo_texto:
-            raise Exception("Retido na tela de login.")
+            raise Exception("Retido na tela de login inicial.")
 
         pot, dia, mes, tot = "0 W", "0 kWh", "0 MWh", "0 MWh"
         
@@ -212,7 +208,6 @@ if loop_ativo:
                 if "mensal" in linha and i+1 < len(linhas): mes = linhas[i+1]
                 if "total" in linha and i+1 < len(linhas): tot = linhas[i+1]
         elif creds["tipo"] == "hoymiles":
-            # Capturas cirúrgicas isoladas baseadas no seu padrão textual real
             pot = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*W)", corpo_texto, "0 W")
             dia = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*kWh)", corpo_texto, "0 kWh")
             mes = extrair_valor_regex(r"([\d.]+)\s*MWh", corpo_texto, "0") + " MWh"
@@ -234,8 +229,7 @@ if loop_ativo:
         st.session_state.historico_leituras[canal_alvo]["timestamp"] = datetime.now().strftime("%H:%M:%S")
         driver.quit()
 
-    # Move a fila circular perpétua de forma 100% segura
-    st.session_state.current_index = (idx_atual + 1) % len(lista_canais)
-    
+    # Avança o indexador de forma circular e segura
+    st.session_state.current_index = (st.session_state.current_index + 1) % len(lista_canais)
     time.sleep(intervalo_loop)
     st.rerun()
