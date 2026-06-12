@@ -27,7 +27,6 @@ st.markdown("""
     .status-table td { padding: 8px 10px; border: 1px solid #2a2e39; background-color: #131722; }
     .neon-green { color: #10b981; text-shadow: 0 0 10px rgba(16, 185, 129, 0.2); }
     .neon-blue { color: #3b82f6; text-shadow: 0 0 10px rgba(59, 130, 246, 0.2); }
-    .neon-purple { color: #a78bfa; text-shadow: 0 0 10px rgba(167, 139, 250, 0.2); }
     .neon-orange { color: #ff9f43; text-shadow: 0 0 10px rgba(255, 159, 67, 0.2); }
     .badge-ok { color: #10b981; font-weight: bold; }
     </style>
@@ -44,7 +43,7 @@ def render_metric_card(label, value, subtext, color_class):
     st.markdown(f"""
         <div style="background-color: #131722; border: 1px solid #2a2e39; border-radius: 4px; padding: 18px; text-align: center; height: 100%;">
             <div style="color: #787b86; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">{label}</div>
-            <div class="{color_class}" style="font-size: 1.9rem; font-weight: bold; margin-top: 5px; margin-bottom: 2px;">{value}</div>
+            <div class="{color_class}" style="font-size: 2.1rem; font-weight: bold; margin-top: 5px; margin-bottom: 2px;">{value}</div>
             <div style="color: #cbd5e1; font-size: 0.8rem;">{subtext}</div>
         </div>
     """, unsafe_allow_html=True)
@@ -64,6 +63,7 @@ else:
     potencia_live_kw = 0.0
     energia_hoje_kwh = ENERGIA_DIARIA_ALVA if hora_decimal > 18.0 else 0.0
 
+# Cálculos Consolidados Dinâmicos
 faturamento_hoje_total = energia_hoje_kwh * VALOR_KWH
 
 dias_passados_junho = agora.day - 1
@@ -77,17 +77,15 @@ faturamento_anual_2026_realizado = faturamento_jan_mai + faturamento_mes_acumula
 energia_anual_mwh_realizado = (energia_jan_mai_kwh / 1000.0) + energia_mes_total_mwh
 
 # ==============================================================================
-# PAINEL DE METRICAS PRINCIPAIS
+# PAINEL DE METRICAS PRINCIPAIS - CORRIGIDO PARA EXATAMENTE 3 CABEÇALHOS
 # ==============================================================================
-col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+col_c1, col_c2, col_c3 = st.columns(3)
 with col_c1:
     render_metric_card("⚡ POTÊNCIA INSTANTÂNEA COMBINADA", f"{potencia_live_kw:.2f} kW", f"Rendimentos Live: R$ {(potencia_live_kw * VALOR_KWH)/60:.2f}/min", "neon-green")
 with col_c2:
     render_metric_card("📅 RENDIMENTO DIÁRIO (HOJE)", f"R$ {faturamento_hoje_total:,.2f}", f"Injeção: {energia_hoje_kwh:,.1f} kWh", "neon-blue")
 with col_c3:
-    render_metric_card("📊 CRÉDITOS DO MÊS (JUNHO)", f"R$ {faturamento_mes_acumulado:,.2f}", f"Volume MWh: {energia_mes_total_mwh:.2f} MWh", "neon-purple")
-with col_c4:
-    render_metric_card("🏛️ PATRIMÔNIO CONSOLIDADO 2026", f"R$ {faturamento_anual_2026_realizado:,.2f}", f"Geração Total: {energia_anual_mwh_realizado:.2f} MWh", "neon-orange")
+    render_metric_card("🏛️ PATRIMÔNIO CONSOLIDADO 2026", f"R$ {faturamento_anual_2026_realizado:,.2f}", f"Geração Total: {energia_anual_mwh_realizado:,.2f} MWh", "neon-orange")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -146,11 +144,10 @@ col_g1, col_g2 = st.columns(2)
 with col_g1:
     st.markdown("""<div class="panel-title-bar">☀️ GRÁFICO DE ENTRADA DIÁRIA (CURVA DE IRRADIÂNCIA EVOLUTIVA)</div>""", unsafe_allow_html=True)
     
-    # 📈 MOTOR DE CURVA DISSOCIADA: Renderiza os dados apenas até o segundo exato atual
     x_linha_progresso = []
     y_linha_progresso = []
     
-    passo_passagem_hora = 0.10  # Resolução fina de pontos
+    passo_passagem_hora = 0.10
     h_cursor = 0.0
     while h_cursor < hora_decimal:
         x_linha_progresso.append(h_cursor)
@@ -161,19 +158,15 @@ with col_g1:
         y_linha_progresso.append(v)
         h_cursor += passo_passagem_hora
 
-    # Garante a plotagem do ponto exato live no final da linha
     x_linha_progresso.append(hora_decimal)
     y_linha_progresso.append(potencia_live_kw)
             
     fig_curva = go.Figure()
-    # Desenha apenas a linha que já aconteceu
     fig_curva.add_trace(go.Scatter(x=x_linha_progresso, y=y_linha_progresso, name="Geração Realizada", hoverinfo="skip", line=dict(color="#10b981", width=3), fill='tozeroy', fillcolor='rgba(16, 185, 129, 0.04)'))
     
-    # Marcador cirúrgico encaixado perfeitamente no eixo cronológico real
     if 6.0 <= hora_decimal <= 18.0:
         fig_curva.add_trace(go.Scatter(x=[hora_decimal], y=[potencia_live_kw], name="Agora", marker=dict(color="#f43f5e", size=10)))
         
-    # Força o layout do grid a manter a escala fixa de 24h na tela sem distorcer o tamanho
     fig_curva.update_layout(paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#787b86', size=10), xaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False, range=[0, 23], tickvals=list(range(0, 24)), ticktext=[f"{h:02d}:00" for h in range(0, 24)]), yaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False, range=[0, ((ENERGIA_DIARIA_ALVA * math.pi) / 24.0) * 1.1]), margin=dict(l=45, r=15, t=15, b=25), showlegend=False, height=240)
     st.plotly_chart(fig_curva, use_container_width=True, config={'displayModeBar': False})
 
@@ -181,7 +174,6 @@ with col_g2:
     st.markdown("""<div class="panel-title-bar">📊 CRONOGRAMA ANUAL DE REPASSE DE DIVIDENDOS 2026</div>""", unsafe_allow_html=True)
     meses_proj = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
     
-    # Zera estritamente os faturamentos futuros no gráfico conforme sua diretiva de auditoria
     faturamentos_brutos_grafico = [
         189000.0 * (VALOR_KWH/0.50), 195000.0 * (VALOR_KWH/0.50), 182000.0 * (VALOR_KWH/0.50), 
         199000.0 * (VALOR_KWH/0.50), 195000.0 * (VALOR_KWH/0.50), faturamento_mes_acumulado,
