@@ -29,7 +29,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ LAB DE TELEMETRIA SOLAR v2.5 (DIAGNOSTIC ENGINE)")
+st.title("⚡ LAB DE TELEMETRIA SOLAR v2.6 (SESSION INITIALIZER)")
 st.markdown("---")
 
 if "historico_api" not in st.session_state or any("potencia" not in v for v in st.session_state.historico_api.values()):
@@ -66,7 +66,7 @@ with col2:
     for canal, dados in st.session_state.historico_api.items():
         status_txt = dados.get("status", "Aguardando")
         if "ONLINE" in status_txt: cor_status = "badge-ok"
-        elif "FALHA" in status_txt or "ERRO" in status_txt: cor_status = "badge-err"
+        elif "FALHA" in status_txt or "RESP" in status_txt: cor_status = "badge-err"
         else: cor_status = "badge-process"
         
         html_tabela += f"""<tr>
@@ -93,7 +93,8 @@ if loop_ativo:
     session = requests.Session()
     session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*"
+        "Accept": "application/json, text/plain, */*",
+        "X-Requested-With": "XMLHttpRequest"
     })
 
     try:
@@ -102,7 +103,10 @@ if loop_ativo:
             response_login = session.post(creds["url_login"], data=payload_login, timeout=8)
             
             if response_login.status_code == 200:
-                # Modificado para a URL estrita de colheita de dados do cliente do app móvel
+                # 🛡️ PASSO CRÍTICO DE ENGENHARIA: Inicializa a usina na memória batendo no index antes de pedir os dados
+                session.get("https://server.growatt.com/index.do", timeout=8)
+                
+                # Passo 3: Agora sim, requisita os dados puros com a sessão já carregada
                 url_dados = "https://server.growatt.com/NewPlantAPI.do?action=getCenterEnergyData"
                 response_dados = session.get(url_dados, timeout=8)
                 
@@ -114,9 +118,8 @@ if loop_ativo:
                     status_txt = "🟢 ONLINE (LIVE)"
                 except:
                     pot, dia, tot = "- W", "- kWh", "- MWh"
-                    # GRAMPO DE ENGENHARIA: Se não for JSON, exibe o começo do texto retornado para sabermos o motivo
                     retorno_cru = response_dados.text.strip()[:35]
-                    status_txt = f"🔴 RESPOSTA: {html.escape(retorno_cru)}"
+                    status_txt = f"🔴 RESP: {html.escape(retorno_cru)}"
             else:
                 pot, dia, tot = "- W", "- kWh", "- MWh"
                 status_txt = f"🔴 FALHA LOGIN ({response_login.status_code})"
