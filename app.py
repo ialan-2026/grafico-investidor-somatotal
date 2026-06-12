@@ -14,13 +14,6 @@ st.set_page_config(page_title="Santo House Solar Terminal", layout="wide")
 FUSO_BR = timezone(timedelta(hours=-3))
 agora = datetime.now(FUSO_BR)
 
-# --- CONFIGURAÇÕES DO MOTOR FINANCEIRO E DO CONSÓRCIO ---
-VALOR_KWH = 0.50
-FATURAMENTO_DIARIO_ALVO = 7000.00  # R$ 7.000,00 bruto alvo no final do dia
-ENERGIA_DIARIA_ALVA = FATURAMENTO_DIARIO_ALVO / VALOR_KWH  # 14.000 kWh
-TAXA_REPASSE_DIVIDENDOS = 0.85  # Consórcio repassa 85% líquido para o investidor (15% taxa adm)
-
-# Estilização interna do Terminal SCADA Enterprise
 st.markdown("""
     <style>
     .block-container { padding: 30px 15px 0px 15px !important; max-width: 99% !important; }
@@ -29,12 +22,24 @@ st.markdown("""
     .stApp { background-color: #0c0f16; font-family: 'Consolas', monospace; }
     .panel-title-bar { background-color: #131722; color: #787b86; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; padding: 6px 12px; border: 1px solid #2a2e39; border-bottom: none; }
     .command-bar { background-color: #131722; border: 1px solid #2a2e39; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; padding: 8px 15px; font-size: 0.75rem; color: #787b86; margin-bottom: 15px; }
+    .status-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; color: #cbd5e1; border: 1px solid #2a2e39; }
+    .status-table th { background-color: #1e2232; color: #787b86; padding: 8px 10px; text-align: left; border: 1px solid #2a2e39; font-weight: bold; }
+    .status-table td { padding: 8px 10px; border: 1px solid #2a2e39; background-color: #131722; }
     .neon-green { color: #10b981; text-shadow: 0 0 10px rgba(16, 185, 129, 0.2); }
     .neon-blue { color: #3b82f6; text-shadow: 0 0 10px rgba(59, 130, 246, 0.2); }
     .neon-purple { color: #a78bfa; text-shadow: 0 0 10px rgba(167, 139, 250, 0.2); }
     .neon-orange { color: #ff9f43; text-shadow: 0 0 10px rgba(255, 159, 67, 0.2); }
+    .badge-ok { color: #10b981; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
+
+# --- CONTROLE INTERATIVO DO PREÇO DA ENERGIA ---
+st.sidebar.markdown("<h3 style='color:#10b981; text-align:center;'>⚙️ CONFIGURAÇÃO DE TARIFAS</h3>", unsafe_allow_html=True)
+VALOR_KWH = st.sidebar.number_input("Valor do kWh Comercializado (R$)", value=0.50, step=0.01, min_value=0.01)
+st.sidebar.markdown("---")
+
+# Definição do volume fixo de engenharia para atingir R$ 7.000,00 quando o kWh for 0,50
+ENERGIA_DIARIA_ALVA = 14000.0  # 14.000 kWh fixos de capacidade nominal do parque
 
 def render_metric_card(label, value, subtext, color_class):
     st.markdown(f"""
@@ -46,10 +51,10 @@ def render_metric_card(label, value, subtext, color_class):
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# ENGINE MATEMÁTICO REAL-TIME SOLAR + DIVISIONAL DE REPASSE
+# ALGORITMO DE GERAÇÃO SOLAR DINÂMICA (100% REPASSE LINEAR)
 # ==============================================================================
 hora_decimal = agora.hour + (agora.minute / 60.0) + (agora.second / 3600.0)
-ruido_live = random.uniform(0.98, 1.02) # Oscilação natural de irradiância
+ruido_live = random.uniform(0.98, 1.02)
 
 if 6.0 <= hora_decimal <= 18.0:
     potencia_pico_kw = (ENERGIA_DIARIA_ALVA * math.pi) / 24.0
@@ -60,98 +65,133 @@ else:
     potencia_live_kw = 0.0
     energia_hoje_kwh = ENERGIA_DIARIA_ALVA if hora_decimal > 18.0 else 0.0
 
-# Cálculos Diários (Hoje)
-faturamento_hoje_bruto = energia_hoje_kwh * VALOR_KWH
-dividendo_hoje_liquido = faturamento_hoje_bruto * TAXA_REPASSE_DIVIDENDOS
+# Cálculos Consolidados Dinâmicos
+faturamento_hoje_total = energia_hoje_kwh * VALOR_KWH
 
-# Cálculos Mensais (Junho Corrente)
 dias_passados_junho = agora.day - 1
-faturamento_historico_junho = dias_passados_junho * 6480.00
-faturamento_mes_bruto = faturamento_historico_junho + faturamento_hoje_bruto
-dividendo_mes_liquido = faturamento_mes_bruto * TAXA_REPASSE_DIVIDENDOS
+faturamento_mes_acumulado = (dias_passados_junho * ENERGIA_DIARIA_ALVA * VALOR_KWH) + faturamento_hoje_total
+energia_mes_total_mwh = ((dias_passados_junho * ENERGIA_DIARIA_ALVA) + energia_hoje_kwh) / 1000.0
+
+# Histórico faturado de Jan a Mai de 2026 (5 meses cheios com base na capacidade nominal)
+energia_jan_mai_kwh = 5 * 30 * ENERGIA_DIARIA_ALVA
+faturamento_jan_mai = energia_jan_mai_kwh * VALOR_KWH
+
+faturamento_anual_2026 = faturamento_jan_mai + faturamento_mes_acumulado
+energia_anual_mwh = (energia_jan_mai_kwh / 1000.0) + energia_mes_total_mwh
 
 # ==============================================================================
-# BANCO DE DADOS DA PROJEÇÃO ANUAL CONSOLIDADA 2026 (JAN A DEZ)
+# PAINEL SUPERIOR DE METRICAS CORPORATIVAS
 # ==============================================================================
-meses_eixo = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun (Atual)", "Jul (Proj)", "Ago (Proj)", "Set (Proj)", "Out (Proj)", "Nov (Proj)", "Dez (Proj)"]
-
-# Histórico Realizado + Modelagem de Projeção Segundo Semestre 2026
-faturamento_bruto_anual = [
-    189000.00, 195000.00, 182000.00, 199000.00, 195000.00, faturamento_mes_bruto, # Realizado + Corrente
-    188000.00, 192000.00, 185000.00, 201000.00, 198000.00, 208000.00  # Projeções baseadas no histórico climático
-]
-dividendos_liquidos_anual = [v * TAXA_REPASSE_DIVIDENDOS for v in faturamento_bruto_anual]
-
-# Totais Acumulados Ano 2026 (Até o presente momento com projeção cheia)
-total_bruto_2026 = sum(faturamento_bruto_anual)
-total_dividendos_2026 = sum(dividendos_liquidos_anual)
-
-# ==============================================================================
-# LAYOUT DE INTERFACE GRÁFICA CONTROL PANEL
-# ==============================================================================
-st.title("⚡ SANTO HOUSE SOLAR TERMINAL v6.5 (CONSÓRCIO & RENDIMENTOS)")
+st.title("⚡ SANTO HOUSE SOLAR TERMINAL v6.5 (GESTÃO DE CRÉDITOS & CONSÓRCIO)")
 st.markdown("---")
 
-# Grid de Cards Avançados: Faturamento do Parque vs. Dividendos do Consórcio
 col_c1, col_c2, col_c3, col_c4 = st.columns(4)
 with col_c1:
-    render_metric_card("⚡ POTÊNCIA INSTANTÂNEA ATIVA", f"{potencia_live_kw:.2f} kW", f"Geração Live: {(potencia_live_kw * VALOR_KWH)/60:.2f} R$/min", "neon-green")
+    render_metric_card("⚡ POTÊNCIA INSTANTÂNEA COMBINADA", f"{potencia_live_kw:.2f} kW", f"Rendimentos Live: R$ {(potencia_live_kw * VALOR_KWH)/60:.2f}/min", "neon-green")
 with col_c2:
-    render_metric_card("📅 OPERAÇÃO DIÁRIA (HOJE)", f"R$ {faturamento_hoje_bruto:,.2f}", f"💰 Retorno Líquido: R$ {dividendo_hoje_liquido:,.2f}", "neon-blue")
+    render_metric_card("📅 RENDIMENTO DIÁRIO (HOJE)", f"R$ {faturamento_hoje_total:,.2f}", f"Injeção: {energia_hoje_kwh:,.1f} kWh", "neon-blue")
 with col_c3:
-    render_metric_card("📊 FECHAMENTO MENSAL (JUNHO)", f"R$ {faturamento_mes_bruto:,.2f}", f"💰 Repasse Consórcio: R$ {dividendo_mes_liquido:,.2f}", "neon-purple")
+    render_metric_card("📊 CRÉDITOS DO MÊS (JUNHO)", f"R$ {faturamento_mes_acumulado:,.2f}", f"Volume MWh: {energia_mes_total_mwh:.2f} MWh", "neon-purple")
 with col_c4:
-    render_metric_card("🏛️ HOLDING PATRIMONIAL 2026", f"R$ {total_bruto_2026:,.2f}", f"💰 Total no Bolso: R$ {total_dividendos_2026:,.2f}", "neon-orange")
+    render_metric_card("🏛️ PATRIMÔNIO CONSOLIDADO 2026", f"R$ {faturamento_anual_2026:,.2f}", f"Geração Total: {energia_anual_mwh:,.2f} MWh", "neon-orange")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Barra de Auditoria de Telecom
+# ==============================================================================
+# QUADRO DO MEIO: 5 USINAS OPERACIONAIS EM LIVE LOOP (100% ONLINE)
+# ==============================================================================
+st.markdown("""<div class="panel-title-bar">🌐 CENTRAL DE GERENCIAMENTO DE ATIVOS: PARQUE FOTOVOLTAICO ATIVO</div>""", unsafe_allow_html=True)
+
+# Vetor de distribuição proporcional de carga e histórico de cada usina simulada
+distribuicao_usinas = [
+    {"nome": "Usina Solar Alvorada Premium", "peso": 0.28, "historico": 452.1},
+    {"nome": "Usina Fotovoltaica Rio Claro", "peso": 0.22, "historico": 341.8},
+    {"nome": "Complexo Solar Novo Horizonte", "peso": 0.18, "historico": 295.4},
+    {"nome": "Parque Solar Guarani Ativos", "peso": 0.17, "historico": 268.2},
+    {"nome": "Central Energética Serra do Mel", "peso": 0.15, "historico": 242.9}
+]
+
+html_quadro_central = """<table class="status-table">
+    <tr>
+        <th>IDENTIFICAÇÃO CANAL / ATIVO</th>
+        <th>POTÊNCIA LIVE</th>
+        <th>GERAÇÃO DIÁRIA (HOJE)</th>
+        <th>GERAÇÃO TOTAL ACUMULADA</th>
+        <th>STATUS CONEXÃO</th>
+        <th>SINCRO LIVE</th>
+    </tr>"""
+
+for u in distribuicao_usinas:
+    pot_u = potencia_live_kw * u["peso"]
+    dia_u = energia_hoje_kwh * u["peso"]
+    tot_u = u["historico"] + (energia_mes_total_mwh * u["peso"])
+    
+    html_quadro_central += f"""<tr>
+        <td><b>{u['nome']}</b></td>
+        <td>{pot_u:.2f} kW</td>
+        <td>{dia_u:.1f} kWh</td>
+        <td>{tot_u:.2f} MWh</td>
+        <td class="badge-ok">🟢 ONLINE (LIVE)</td>
+        <td>{agora.strftime('%H:%M:%S')}</td>
+    </tr>"""
+html_quadro_central += "</table>"
+st.markdown(html_quadro_central, unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# Barra de Linha de Comando SCADA
 st.markdown(f"""
     <div class="command-bar">
-        <div>❖ SCADA ENGINE: MODELO FINANCEIRO CONSOLIDADO // DIVIDEND PASS-RATE: <b>{(TAXA_REPASSE_DIVIDENDOS*100):.0f}% LÍQUIDO</b></div>
-        <div>DATA/HORA DO REGISTRO: <b>{agora.strftime('%d/%m/%Y — %H:%M:%S')}</b></div>
-        <div style="color: #10b981; font-weight: bold; letter-spacing: 0.5px;">● ATUALIZAÇÃO REATIVA CONVERTIDA (1s TICK)</div>
+        <div>❖ SCADA RECON ENGINE // REPASSE NOMINAL DE CRÉDITOS: <b>100% INTEGRAL VINCULADO</b></div>
+        <div>DATA E HORA DO REGISTRO: <b>{agora.strftime('%d/%m/%Y — %H:%M:%S')}</b></div>
+        <div style="color: #10b981; font-weight: bold;">● ATUALIZAÇÃO REATIVA REAL-TIME (1s REFRESH LOOP)</div>
     </div>
 """, unsafe_allow_html=True)
 
+# --- RENDERIZAÇÃO DOS GRÁFICOS COMPORTAMENTAIS ---
 col_g1, col_g2 = st.columns(2)
 
 with col_g1:
-    st.markdown("""<div class="panel-title-bar">☀️ PROCESSO DE ENTRADA DIÁRIA (GERAÇÃO REAL TIME)</div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="panel-title-bar">☀️ GRÁFICO DE ENTRADA DIÁRIA (CURVA DE IRRADIÂNCIA PARABÓLICA)</div>""", unsafe_allow_html=True)
     horas_eixo = [f"{h:02d}:00" for h in range(0, 24)]
     valores_curva = [(((ENERGIA_DIARIA_ALVA * math.pi) / 24.0) * math.sin(math.pi * (h - 6) / 12)) if 6 <= h <= 18 else 0.0 for h in range(0, 24)]
             
     fig_curva = go.Figure()
-    fig_curva.add_trace(go.Scatter(x=horas_eixo, y=valores_curva, name="Injeção (kW)", line=dict(color="#10b981", width=3), fill='tozeroy', fillcolor='rgba(16, 185, 129, 0.04)'))
+    fig_curva.add_trace(go.Scatter(x=horas_eixo, y=valores_curva, name="Geração (kW)", line=dict(color="#10b981", width=3), fill='tozeroy', fillcolor='rgba(16, 185, 129, 0.04)'))
     if 6.0 <= hora_decimal <= 18.0:
         fig_curva.add_trace(go.Scatter(x=[f"{agora.hour:02d}:{agora.minute:02d}"], y=[potencia_live_kw], name="Agora", marker=dict(color="#f43f5e", size=12)))
         
-    fig_curva.update_layout(paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#787b86', size=10), xaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False), yaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False), margin=dict(l=45, r=15, t=15, b=25), showlegend=False, height=260)
+    fig_curva.update_layout(paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#787b86', size=10), xaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False), yaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False), margin=dict(l=45, r=15, t=15, b=25), showlegend=False, height=240)
     st.plotly_chart(fig_curva, use_container_width=True, config={'displayModeBar': False})
 
 with col_g2:
-    st.markdown("""<div class="panel-title-bar">📊 PROJEÇÃO ANUAL ATÉ DEZEMBRO: BRUTO VS. DIVIDENDOS PAGOS</div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="panel-title-bar">📊 CRONOGRAMA ANUAL DE REPASSE DE DIVIDENDOS 2026</div>""", unsafe_allow_html=True)
+    meses_proj = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+    
+    # Modelagem estrita de faturamento sem desconto para o ano inteiro de 2026 baseado no valor dinâmico do kWh
+    faturamentos_brutos = [
+        189000.0 * (VALOR_KWH/0.50), 195000.0 * (VALOR_KWH/0.50), 182000.0 * (VALOR_KWH/0.50), 
+        199000.0 * (VALOR_KWH/0.50), 195000.0 * (VALOR_KWH/0.50), faturamento_mes_acumulado,
+        188000.0 * (VALOR_KWH/0.50), 192000.0 * (VALOR_KWH/0.50), 185000.0 * (VALOR_KWH/0.50), 
+        201000.0 * (VALOR_KWH/0.50), 198000.0 * (VALOR_KWH/0.50), 208000.0 * (VALOR_KWH/0.50)
+    ]
     
     fig_hist = go.Figure()
-    # Barra de Faturamento Bruto da Usina
-    fig_hist.add_trace(go.Bar(x=meses_eixo, y=faturamento_bruto_anual, name="Faturamento Bruto", marker_color='#3b82f6'))
-    # Barra de Dividendos Líquidos creditados pelo Consórcio
-    fig_hist.add_trace(go.Bar(x=meses_eixo, y=dividendos_liquidos_anual, name="Dividendos Pagos", marker_color='#a78bfa'))
-    
-    fig_hist.update_layout(paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#787b86', size=10), xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False), barmode='group', margin=dict(l=45, r=15, t=15, b=25), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), height=260)
+    fig_hist.add_trace(go.Bar(x=meses_proj, y=faturamentos_brutos, name="Faturamento Repassado (100%)", marker_color='#3b82f6', text=[f"R$ {v/1000:.0f}k" for v in faturamentos_brutos], textposition='auto', textfont=dict(size=8, color="#cbd5e1")))
+    fig_hist.update_layout(paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#787b86', size=10), xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='#2a2e39', zeroline=False), margin=dict(l=45, r=15, t=15, b=25), showlegend=False, height=240)
     st.plotly_chart(fig_hist, use_container_width=True, config={'displayModeBar': False})
 
-# Tabela Corporativa Auditaria de Créditos do Consórcio
-st.markdown("""<div class="panel-title-bar">📋 RELATÓRIO DE REPASSE DE ATIVOS DA GERENCIADORA DE CRÉDITOS</div>""", unsafe_allow_html=True)
+# Tabela Auditoria Corporativa 100% Repasse
+st.markdown("""<div class="panel-title-bar">📋 DEMONSTRATIVO CONTÁBIL: LIQUIDAÇÃO E REPASSE INTEGRAL DE CRÉDITOS</div>""", unsafe_allow_html=True)
 df_auditoria = pd.DataFrame({
-    "Mês de Competência": meses_eixo,
-    "Faturamento Bruto Solar": [f"R$ {v:,.2f}" for v in faturamento_bruto_anual],
-    "Taxa de Administração Consórcio (15%)": [f"R$ {(v*0.15):,.2f}" for v in faturamento_bruto_anual],
-    "Dividendos Líquidos Injetados (85%)": [f"R$ {v:,.2f}" for v in dividendos_liquidos_anual],
-    "Auditoria Compliance": ["Efetivado" if "Proj" not in m else "Garantido em Contrato" for m in meses_eixo]
+    "Período de Competência": meses_proj,
+    "Energia Alocada no Consórcio": [f"{(v/VALOR_KWH)/1000:,.2f} MWh" for v in faturamentos_brutos],
+    "Faturamento Bruto Gerado": [f"R$ {v:,.2f}" for v in faturamentos_brutos],
+    "Rendimento Repassado ao Investidor (100%)": [f"R$ {v:,.2f}" for v in faturamentos_brutos],
+    "Status de Compensação ANEEL": ["Compensado e Creditado" if "Jul" not in m and "Ago" not in m and "Set" not in m and "Out" not in m and "Nov" not in m and "Dez" not in m else "Geração Garantida em Âncora" for m in meses_proj]
 })
 st.dataframe(df_auditoria, use_container_width=True, hide_index=True)
 
-# Loop perpétuo de atualização instantânea
+# Loop ativo infinito de atualização
 time.sleep(1)
 st.rerun()
