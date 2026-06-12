@@ -10,12 +10,14 @@ from selenium.webdriver.support import expected_conditions as EC
 
 st.set_page_config(page_title="Engenharia de Telemetria Solar", layout="wide")
 
-# Lista estrita e filtrada de conexões fornecidas e validadas pelo operador
 DADOS_CONEXAO = {
+    "Canal 01 (Solarman/Deye)": {"url": "https://pro.solarmanpv.com/login", "user": "solaralbano@gmail.com", "pass": "mBA4rvnSMuc5", "tipo": "solarman"},
     "Canal 02 (ShineMonitor)": {"url": "https://www.shinemonitor.com/", "user": "Albano Solar", "pass": "oNa17112#", "tipo": "shinemonitor"},
     "Canal 03 (Hopewind)": {"url": "https://hopewindcloud.eu/#/login", "user": "solaralbano@gmail.com", "pass": "oNa17112", "tipo": "hopewind"},
+    "Canal 04 (Growatt)": {"url": "https://oss.growatt.com/login?lang=en", "user": "EBBJQA001", "pass": "Solarjob123", "tipo": "growatt"},
     "Canal 05 (Hoymiles)": {"url": "https://global.hoymiles.com/website", "user": "solarjob", "pass": "Solarjob@123", "tipo": "hoymiles"},
-    "Canal 06 (FoxESS)": {"url": "https://www.foxesscloud.com/v2/login", "user": "solarjob", "pass": "Solarjob@123", "tipo": "foxess"}
+    "Canal 06 (FoxESS)": {"url": "https://www.foxesscloud.com/v2/login", "user": "solarjob", "pass": "Solarjob@123", "tipo": "foxess"},
+    "Canal 07 (Fronius)": {"url": "https://login.fronius.com/authenticationendpoint/login.do?client_id=mf_o9iTAyKemNLQTa6Sp6HYonCIa", "user": "engenharia@solarjob.com.br", "pass": "Solarjob@1234", "tipo": "fronius"}
 }
 
 st.markdown("""
@@ -26,18 +28,16 @@ st.markdown("""
     .status-table td { padding: 10px; border: 1px solid #2a2e39; background-color: #131722; }
     .badge-ok { color: #10b981; font-weight: bold; }
     .badge-err { color: #f43f5e; font-weight: bold; }
-    .badge-process { color: #3b82f6; font-weight: bold; anim-blink { animation: blink 1s infinite; } }
+    .badge-process { color: #3b82f6; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("⚡ LAB DE ENGENHARIA E TELEMETRIA CÍCLICA v1.5 (TRUE LOOP)")
 st.markdown("---")
 
-# Inicialização da memória interna exclusiva de telemetria
 if "historico_leituras" not in st.session_state:
     st.session_state.historico_leituras = {k: {"potencia": "- W", "diaria": "- kWh", "mensal": "- MWh", "total": "- MWh", "status": "Aguardando Inicialização", "timestamp": "-"} for k in DADOS_CONEXAO.keys()}
 
-# Inicialização do indexador do laço perpétuo
 if "current_index" not in st.session_state:
     st.session_state.current_index = 0
 
@@ -72,7 +72,6 @@ def extrair_valor_regex(padrao, texto, default="-"):
     except:
         return default
 
-# Painel consolidado na direita
 with col2:
     st.subheader("📊 Painel de Controle e Coleta Consolidada")
     
@@ -103,9 +102,7 @@ with col2:
 
     console_placeholder = st.empty()
 
-# ==============================================================================
-# EXECUÇÃO DA MÁQUINA DE ESTADO DO LOOP INFINITO (UM POR VEZ SEM CONGELAR)
-# ==============================================================================
+# --- EXECUÇÃO DA MÁQUINA DE ESTADO DO LOOP INFINITO ---
 if loop_ativo:
     lista_canais = list(DADOS_CONEXAO.keys())
     idx_atual = st.session_state.current_index
@@ -132,7 +129,16 @@ if loop_ativo:
         driver.get(creds["url"])
         wait = WebDriverWait(driver, 15)
 
-        if creds["tipo"] == "shinemonitor":
+        if creds["tipo"] == "solarman":
+            inputs = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//input[@type='text']")))
+            u_in = [i for i in inputs if i.is_displayed()][0]
+            p_in = driver.find_element(By.XPATH, "//input[@type='password']")
+            forcar_preenchimento(u_in, creds["user"])
+            forcar_preenchimento(p_in, creds["pass"])
+            btn = driver.find_element(By.XPATH, "//button[@type='submit' or contains(text(), 'Login')]")
+            driver.execute_script("arguments[0].click();", btn)
+
+        elif creds["tipo"] == "shinemonitor":
             u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@id, 'username') or @type='text']")))
             p_in = driver.find_element(By.XPATH, "//input[contains(@id, 'password') or @type='password']")
             forcar_preenchimento(u_in, creds["user"])
@@ -152,6 +158,14 @@ if loop_ativo:
             btn = driver.find_element(By.XPATH, "//button[contains(@class, 'el-button--primary') or @type='button']")
             driver.execute_script("arguments[0].click();", btn)
 
+        elif creds["tipo"] == "growatt":
+            u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@id='username' or @id='val_login_account' or @name='username']")))
+            p_in = driver.find_element(By.XPATH, "//input[@id='password' or @id='val_login_pwd' or @name='password']")
+            forcar_preenchimento(u_in, creds["user"])
+            forcar_preenchimento(p_in, creds["pass"])
+            btn = driver.find_element(By.XPATH, "//*[contains(@class, 'login') or @type='submit']")
+            driver.execute_script("arguments[0].click();", btn)
+
         elif creds["tipo"] == "hoymiles":
             u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='text']")))
             p_in = driver.find_element(By.XPATH, "//input[@type='password']")
@@ -168,22 +182,33 @@ if loop_ativo:
             btn = driver.find_element(By.XPATH, "//*[contains(@class, 'login') or @type='button' or @type='submit']")
             driver.execute_script("arguments[0].click();", btn)
 
+        elif creds["tipo"] == "fronius":
+            u_in = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@id='username' or @name='username' or @type='text']")))
+            p_in = driver.find_element(By.XPATH, "//input[@id='password' or @name='password' or @type='password']")
+            forcar_preenchimento(u_in, creds["user"])
+            forcar_preenchimento(p_in, creds["pass"])
+            btn = driver.find_element(By.XPATH, "//*[contains(@id, 'login') or @type='submit']")
+            driver.execute_script("arguments[0].click();", btn)
+
         time.sleep(tempo_estabilizacao)
         corpo_texto = driver.find_element(By.TAG_NAME, "body").text
         
+        # --- ENGINE DE FILTRAGEM REFINADA E ANTIVAZAMENTO ---
         pot, dia, mes, tot = "- W", "- kWh", "- MWh", "- MWh"
         
-        if creds["tipo"] == "hoymiles":
-            mes = extrair_valor_regex(r"This month\n([\d.,\s\w]+)", corpo_texto, "- MWh")
-            tot = extrair_valor_regex(r"Lifetime\n([\d.,\s\w]+)", corpo_texto, "- MWh")
-        elif creds["tipo"] == "shinemonitor":
-            pot = extrair_valor_regex(r"Current Power\n([\d.,\s\w]+)", corpo_texto, "- kW")
-            dia = extrair_valor_regex(r"Today Energy\n([\d.,\s\w]+)", corpo_texto, "- kWh")
-            tot = extrair_valor_regex(r"Total Energy\n([\d.,\s\w]+)", corpo_texto, "- MWh")
+        if creds["tipo"] == "solarman":
+            linhas = corpo_texto.split('\n')
+            for i, linha in enumerate(linhas):
+                if "tempo real" in linha and i+1 < len(linhas): pot = linhas[i+1]
+                if "diária" in linha and i+1 < len(linhas): dia = linhas[i+1]
+                if "mensal" in linha and i+1 < len(linhas): mes = linhas[i+1]
+                if "total" in linha and i+1 < len(linhas): tot = linhas[i+1] # Corrigido de server_linha para linha
         else:
-            pot = extrair_valor_regex(r"(?:Power Now|Current Power|Potência)[\s:]*([\d.,]+\s*(?:W|kW))", corpo_texto, "- kW")
-            dia = extrair_valor_regex(r"(?:Today|Diária)[\s:]*([\d.,]+\s*kWh)", corpo_texto, "- kWh")
-            tot = extrair_valor_regex(r"(?:Cumulative|Total)[\s:]*([\d.,]+\s*(?:kWh|MWh))", corpo_texto, "- MWh")
+            # Capturas cirúrgicas baseadas apenas nos padrões numéricos + unidades (Evita arrastar strings inteiras)
+            pot = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*(?:kW|W|MW))", corpo_texto, "- W")
+            dia = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*kWh)", corpo_texto, "- kWh")
+            mes = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*MWh)", corpo_texto, "- MWh")
+            tot = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*(?:GWh|MWh))", corpo_texto, "- MWh")
 
         st.session_state.historico_leituras[canal_alvo] = {
             "potencia": pot, "diaria": dia, "mensal": mes, "total": tot,
@@ -192,14 +217,12 @@ if loop_ativo:
         driver.quit()
 
     except Exception as err:
-        # Em caso de erro, altera o status do canal alvo e libera o fluxo
         st.session_state.historico_leituras[canal_alvo]["status"] = "🔴 FALHA DE REDE"
         st.session_state.historico_leituras[canal_alvo]["timestamp"] = datetime.now().strftime("%H:%M:%S")
         driver.quit()
 
-    # Avança o ponteiro do indexador de forma circular (Volta ao 0 quando chega no fim)
+    # Incrementa e roda a fila circular perpétua
     st.session_state.current_index = (idx_atual + 1) % len(lista_canais)
     
-    # Tempo de transição antes de recarregar e ir para o próximo alvo
     time.sleep(intervalo_loop)
     st.rerun()
