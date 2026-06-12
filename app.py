@@ -7,7 +7,6 @@ from datetime import datetime
 
 st.set_page_config(page_title="API Telemetria Solar", layout="wide")
 
-# Mantemos a estrutura global, mas calibramos o motor interno da Growatt
 DADOS_CONEXAO = {
     "Canal 01 (Solarman/Deye)": {"url_login": "https://api.solarmanpv.com/account-api/v1.0/user/login", "user": "solaralbano@gmail.com", "pass": "mBA4rvnSMuc5", "tipo": "json_payload"},
     "Canal 02 (ShineMonitor)": {"url_login": "https://www.shinemonitor.com/index_en.html", "user": "Albano Solar", "pass": "oNa17112#", "tipo": "form_payload"},
@@ -33,10 +32,17 @@ st.markdown("""
 st.title("⚡ LAB DE TELEMETRIA SOLAR v2.4 (LIVE DATA EXTRACTOR)")
 st.markdown("---")
 
-if "historico_api" not in st.session_state:
+# 🛡️ PROTEÇÃO: Se a memória não existir OU for do modelo antigo, força o reset completo da estrutura
+if "historico_api" not in st.session_state or any("potencia" not in v for v in st.session_state.historico_api.values()):
     st.session_state.historico_api = {k: {"potencia": "- W", "diaria": "- kWh", "total": "- MWh", "status": "Aguardando Inicialização", "timestamp": "-"} for k in DADOS_CONEXAO.keys()}
 
 if "current_api_index" not in st.session_state:
+    st.session_state.current_api_index = 0
+
+lista_canais = list(DADOS_CONEXAO.keys())
+
+# Anti-Overstep de array
+if st.session_state.current_api_index >= len(lista_canais) or st.session_state.current_api_index < 0:
     st.session_state.current_api_index = 0
 
 col1, col2 = st.columns([1, 2])
@@ -60,29 +66,27 @@ with col2:
         </tr>"""
     
     for canal, dados in st.session_state.historico_api.items():
-        if "ONLINE" in dados["status"]: cor_status = "badge-ok"
-        elif "FALHA" in dados["status"]: cor_status = "badge-err"
+        status_txt = dados.get("status", "Aguardando")
+        if "ONLINE" in status_txt: cor_status = "badge-ok"
+        elif "FALHA" in status_txt: cor_status = "badge-err"
         else: cor_status = "badge-process"
         
+        # 🛡️ PROTEÇÃO COM .get(): Se a chave não existir na memória por delay, ele põe um "-" em vez de quebrar a tela
         html_tabela += f"""<tr>
             <td><b>{canal}</b></td>
-            <td><code>{dados['potencia']}</code></td>
-            <td><code>{dados['diaria']}</code></td>
-            <td><code>{dados['total']}</code></td>
-            <td class="{cor_status}">{dados['status']}</td>
-            <td>{dados['timestamp']}</td>
+            <td><code>{dados.get('potencia', '- W')}</code></td>
+            <td><code>{dados.get('diaria', '- kWh')}</code></td>
+            <td><code>{dados.get('total', '- MWh')}</code></td>
+            <td class="{cor_status}">{status_txt}</td>
+            <td>{dados.get('timestamp', '-')}</td>
         </tr>"""
     html_tabela += "</table>"
     st.markdown(html_tabela, unsafe_allow_html=True)
 
     console_placeholder = st.empty()
 
+# --- ENGINE PRINCIPAL DA FILA CIRCULAR VIA REQUISITOS ---
 if loop_ativo:
-    lista_canais = list(DADOS_CONEXAO.keys())
-    
-    if st.session_state.current_api_index >= len(lista_canais):
-        st.session_state.current_api_index = 0
-        
     idx_atual = st.session_state.current_api_index
     canal_alvo = lista_canais[idx_atual]
     creds = DADOS_CONEXAO[canal_alvo]
@@ -97,39 +101,28 @@ if loop_ativo:
     })
 
     try:
-        # ==============================================================================
-        # MOTOR EXCLUSIVO: IMPLEMENTAÇÃO DO CRACHÁ DIGITAL GROWATT
-        # ==============================================================================
         if creds["tipo"] == "growatt_api":
-            # Passo 1: Envia o batedor de login para obter o Cookie de Sessão corporativo
             payload_login = {"account": creds["user"], "password": creds["pass"], "validateCode": ""}
             response_login = session.post(creds["url_login"], data=payload_login, timeout=8)
             
-            # Passo 2: Se o login passou, usa a mesma sessão para colher a árvore de dados puros
             if response_login.status_code == 200:
                 url_dados = "https://server.growatt.com/NewPlantAPI.do?action=getCenterEnergyData"
                 response_dados = session.get(url_dados, timeout=8)
                 
                 try:
                     dados_json = response_dados.json()
-                    # Garimpa os valores exatos de dentro do mapa de memória do servidor
                     pot = dados_json.get("power", "0") + " W"
                     dia = dados_json.get("todayEnergy", "0") + " kWh"
                     tot = dados_json.get("totalEnergy", "0") + " MWh"
                     status_txt = "🟢 ONLINE (LIVE)"
                 except:
-                    # Fallback de segurança caso o formato JSON varie
                     pot, dia, tot = "- W", "- kWh", "- MWh"
                     status_txt = "🔴 ERRO NO PARSER JSON"
             else:
                 pot, dia, tot = "- W", "- kWh", "- MWh"
                 status_txt = "🔴 LOGIN REJEITADO"
 
-        # ==============================================================================
-        # CANAIS ADICIONAIS (EM ESTÁGIO DE MAPEAMENTO PROGRESSIVO)
-        # ==============================================================================
         else:
-            # Mantém as outras conexões batendo o ponto no servidor para auditoria de portas
             if creds["tipo"] == "json_payload":
                 session.post(creds["url_login"], json={"username": creds["user"], "password": creds["pass"]}, timeout=5)
             elif creds["tipo"] == "hoymiles_payload":
@@ -138,7 +131,6 @@ if loop_ativo:
             pot, dia, tot = "Staging", "Staging", "Staging"
             status_txt = "🟠 AGUARDANDO REVERSÃO"
 
-        # Consolida os dados na interface gráfica
         st.session_state.historico_api[canal_alvo] = {
             "potencia": pot, "diaria": dia, "total": tot,
             "status": status_txt, "timestamp": datetime.now().strftime("%H:%M:%S")
