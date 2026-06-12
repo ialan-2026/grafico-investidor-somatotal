@@ -27,12 +27,10 @@ st.markdown("""
     .status-table th { background-color: #1e2232; color: #787b86; padding: 10px; text-align: left; border: 1px solid #2a2e39; }
     .status-table td { padding: 10px; border: 1px solid #2a2e39; background-color: #131722; }
     .badge-ok { color: #10b981; font-weight: bold; }
-    .badge-err { color: #f43f5e; font-weight: bold; }
-    .badge-process { color: #3b82f6; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ LAB DE ENGENHARIA E TELEMETRIA CÍCLICA v1.5 (TRUE LOOP)")
+st.title("⚡ LAB DE ENGENHARIA E TELEMETRIA CÍCLICA v1.6")
 st.markdown("---")
 
 if "historico_leituras" not in st.session_state:
@@ -45,15 +43,9 @@ col1, col2 = st.columns([1, 2])
 
 with col1:
     st.subheader("⚙️ Parâmetros do Ciclo")
-    tempo_estabilizacao = st.slider("Tempo de Espera Pós-Login (segundos)", 3, 25, 12)
-    intervalo_loop = st.slider("Intervalo de Espera entre Canais (segundos)", 5, 60, 25)
+    tempo_estabilizacao = st.slider("Tempo de Espera Pós-Login (segundos)", 3, 25, 15)
+    intervalo_loop = st.slider("Intervalo de Espera entre Canais (segundos)", 5, 60, 20)
     loop_ativo = st.toggle("Ativar Varredura Cíclica Perpétua", value=False)
-    
-    st.markdown("---")
-    st.markdown("""
-        ### 💡 Regra de Negócio do Motor:
-        O sistema opera em uma fila circular. Se um canal falhar por timeout ou indisponibilidade do servidor nativo, ele é marcado como **FALHA DE REDE** e o sistema pula imediatamente para o próximo da fila. Na próxima volta completa do laço, o canal com falha será retestado automaticamente.
-    """)
 
 def inicializar_driver_antidetect():
     options = Options()
@@ -73,7 +65,7 @@ def extrair_valor_regex(padrao, texto, default="-"):
         return default
 
 with col2:
-    st.subheader("📊 Painel de Controle e Coleta Consolidada")
+    st.subheader("📊 Painel de Monitoramento (Apenas Conexões Ativas)")
     
     html_tabela = """<table class="status-table">
         <tr>
@@ -86,29 +78,38 @@ with col2:
             <th>SINCRO</th>
         </tr>"""
     
+    usinas_visiveis = 0
     for canal, dados in st.session_state.historico_leituras.items():
-        cor_status = "badge-ok" if "ONLINE" in dados["status"] else ("badge-err" if "FALHA" in dados["status"] else "badge-process")
+        # CRÍTICO: Filtra para exibir NO QUADRO apenas as que logaram com sucesso de verdade
+        if "🟢 ONLINE" not in dados["status"]:
+            continue
+            
+        usinas_visiveis += 1
         html_tabela += f"""<tr>
             <td><b>{canal}</b></td>
             <td>{dados['potencia']}</td>
             <td>{dados['diaria']}</td>
             <td>{dados['mensal']}</td>
             <td>{dados['total']}</td>
-            <td class="{cor_status}">{dados['status']}</td>
+            <td class="badge-ok">{dados['status']}</td>
             <td>{dados['timestamp']}</td>
         </tr>"""
+        
     html_tabela += "</table>"
-    st.markdown(html_tabela, unsafe_allow_html=True)
+    
+    if usinas_visiveis > 0:
+        st.markdown(html_tabela, unsafe_allow_html=True)
+    else:
+        st.info("ℹ️ Nenhuma usina conectada ao vivo no momento. Ligue a Varredura Perpétua abaixo para sincronizar.")
 
     console_placeholder = st.empty()
 
-# --- EXECUÇÃO DA MÁQUINA DE ESTADO DO LOOP INFINITO ---
+# --- ENGINE DO LOOP INFINITO DA FILA CIRCULAR ---
 if loop_ativo:
     lista_canais = list(DADOS_CONEXAO.keys())
     idx_atual = st.session_state.current_index
     canal_alvo = lista_canais[idx_atual]
     
-    st.session_state.historico_leituras[canal_alvo]["status"] = "⚡ LENDO AGORA..."
     console_placeholder.info(f"🔄 Executando varredura no canal: {canal_alvo}...")
     
     creds = DADOS_CONEXAO[canal_alvo]
@@ -193,7 +194,10 @@ if loop_ativo:
         time.sleep(tempo_estabilizacao)
         corpo_texto = driver.find_element(By.TAG_NAME, "body").text
         
-        # --- ENGINE DE FILTRAGEM REFINADA E ANTIVAZAMENTO ---
+        # 🛡️ BARREIRA DE VALIDAÇÃO: Se ainda contiver termos de login na tela, força a falha de rede
+        if "Forgot Password" in corpo_texto or "Remember Me" in corpo_texto or "Forgot user/password" in corpo_texto or "Sign Up" in corpo_texto:
+            raise Exception("Login rejeitado pelo servidor ou bloqueado por Captcha.")
+
         pot, dia, mes, tot = "- W", "- kWh", "- MWh", "- MWh"
         
         if creds["tipo"] == "solarman":
@@ -202,9 +206,12 @@ if loop_ativo:
                 if "tempo real" in linha and i+1 < len(linhas): pot = linhas[i+1]
                 if "diária" in linha and i+1 < len(linhas): dia = linhas[i+1]
                 if "mensal" in linha and i+1 < len(linhas): mes = linhas[i+1]
-                if "total" in linha and i+1 < len(linhas): tot = linhas[i+1] # Corrigido de server_linha para linha
+                if "total" in linha and i+1 < len(linhas): tot = linhas[i+1]
+        elif creds["tipo"] == "hoymiles":
+            # Calibração cirúrgica para a quebra de linha da Hoymiles vista no seu log
+            mes = extrair_valor_regex(r"This month\s*\n\s*([\d.]+)\s*MWh", corpo_texto, "- MWh") + " MWh"
+            tot = extrair_valor_regex(r"Lifetime\s*\n\s*([\d.]+)\s*(?:GWh|MWh)", corpo_texto, "- MWh") + " GWh"
         else:
-            # Capturas cirúrgicas baseadas apenas nos padrões numéricos + unidades (Evita arrastar strings inteiras)
             pot = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*(?:kW|W|MW))", corpo_texto, "- W")
             dia = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*kWh)", corpo_texto, "- kWh")
             mes = extrair_valor_regex(r"(\d+(?:\.\d+)?\s*MWh)", corpo_texto, "- MWh")
@@ -217,11 +224,11 @@ if loop_ativo:
         driver.quit()
 
     except Exception as err:
+        # Se falhar, joga para o status vermelho e sai da tabela visível sem interromper o loop
         st.session_state.historico_leituras[canal_alvo]["status"] = "🔴 FALHA DE REDE"
-        st.session_state.historico_leituras[canal_alvo]["timestamp"] = datetime.now().strftime("%H:%M:%S")
         driver.quit()
 
-    # Incrementa e roda a fila circular perpétua
+    # Move a fila perpétua para o próximo canal de forma circular
     st.session_state.current_index = (idx_atual + 1) % len(lista_canais)
     
     time.sleep(intervalo_loop)
