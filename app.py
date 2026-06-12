@@ -1,12 +1,10 @@
 import streamlit as st
 import requests
 import time
-import json
 from datetime import datetime
 
 st.set_page_config(page_title="API Telemetria Solar", layout="wide")
 
-# Banco de dados centralizado com os endpoints de autenticação das plataformas
 DADOS_CONEXAO = {
     "Canal 01 (Solarman/Deye)": {
         "url_login": "https://api.solarmanpv.com/account-api/v1.0/user/login", 
@@ -26,14 +24,14 @@ DADOS_CONEXAO = {
     },
     "Canal 05 (Hoymiles)": {
         "url_login": "https://global.hoymiles.com/iam/api/login", 
-        "user": "solarjob", "pass": "Solarjob@123", "tipo": "json_payload"
+        "user": "solarjob", "pass": "Solarjob@123", "tipo": "hoymiles_payload"
     },
     "Canal 06 (FoxESS)": {
         "url_login": "https://www.foxesscloud.com/v2/api/login", 
         "user": "solarjob", "pass": "Solarjob@123", "tipo": "json_payload"
     },
     "Canal 07 (Fronius)": {
-        "url_login": "https://login.fronius.com/oauth2/token", 
+        "url_login": "https://login.fronius.com/authenticationendpoint/login.do?client_id=mf_o9iTAyKemNLQTa6Sp6HYonCIa", 
         "user": "engenharia@solarjob.com.br", "pass": "Solarjob@1234", "tipo": "oauth_payload"
     }
 }
@@ -50,7 +48,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ LAB DE TELEMETRIA SOLAR v2.0 (BACKGROUND API ENGINE)")
+st.title("⚡ LAB DE TELEMETRIA SOLAR v2.1 (BACKGROUND API ENGINE)")
 st.markdown("---")
 
 if "historico_api" not in st.session_state:
@@ -65,14 +63,6 @@ with col1:
     st.subheader("⚙️ Parâmetros de Chamada")
     intervalo_loop = st.slider("Espera de Varredura entre Canais (segundos)", 1, 10, 5)
     loop_ativo = st.toggle("Ativar Varredura Cíclica Perpétua via API", value=False)
-    
-    st.markdown("---")
-    st.markdown("""
-        ### 📡 Vantagens desta Nova Arquitetura:
-        * **Velocidade Extrema:** Sem abrir navegadores, as chamadas HTTP levam milissegundos.
-        * **Sem Bloqueio Visual:** Ignora mudanças de botões, cores ou layouts do site.
-        * **Leitura de Dados Puros:** Captura direto a resposta de memória enviada para o painel.
-    """)
 
 with col2:
     st.subheader("📊 Painel de Controle e Coleta Consolidada")
@@ -87,10 +77,7 @@ with col2:
         </tr>"""
     
     for canal, dados in st.session_state.historico_api.items():
-        if "ONLINE" in dados["status"]: cor_status = "badge-ok"
-        elif "FALHA" in dados["status"]: cor_status = "badge-err"
-        else: cor_status = "badge-process"
-        
+        cor_status = "badge-ok" if "ONLINE" in dados["status"] else ("badge-err" if "FALHA" in dados["status"] else "badge-process")
         html_tabela += f"""<tr>
             <td><b>{canal}</b></td>
             <td><code>{dados['status_http']}</code></td>
@@ -103,7 +90,6 @@ with col2:
 
     console_placeholder = st.empty()
 
-# --- INSTANCIAÇÃO DA MÁQUINA DE ESTADO ASSÍNCRONA ---
 if loop_ativo:
     lista_canais = list(DADOS_CONEXAO.keys())
     
@@ -117,43 +103,60 @@ if loop_ativo:
     st.session_state.historico_api[canal_alvo]["status"] = "📡 REQUISITANDO ENDPOINT..."
     console_placeholder.info(f"🔄 Disparando Requisição HTTP de Segundo Plano: {canal_alvo}...")
     
-    # Cria uma sessão HTTP isolada na memória para guardar os cookies gerados automaticamente
     session = requests.Session()
-    session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    
+    # Cabeçalhos padrão emulando requisições vindas de um App Mobile real
+    headers_padrao = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
         "Accept": "application/json, text/plain, */*",
-        "Content-Type": "application/json;charset=UTF-8" if creds["tipo"] == "json_payload" else "application/x-www-form-urlencoded"
-    })
+        "X-Requested-With": "com.hoymiles.inverter" if "Hoymiles" in canal_alvo else "XMLHttpRequest"
+    }
+    session.headers.update(headers_padrao)
 
     try:
-        # Montagem inteligente do payload dependendo de como o servidor aceita a informação
+        # Tratamento individualizado baseado nas assinaturas de segurança coletadas no print v2.0
         if creds["tipo"] == "json_payload":
             payload = {"username": creds["user"], "password": creds["pass"]}
             response = session.post(creds["url_login"], json=payload, timeout=8)
-        else:
-            payload = {"username": creds["user"], "password": creds["pass"], "account": creds["user"], "password": creds["pass"]}
+            
+        elif creds["tipo"] == "hoymiles_payload":
+            # Formato de payload estrito exigido pelo gateway da Hoymiles Cloud
+            payload = {"user_name": creds["user"], "password": creds["pass"], "language": "en_US"}
+            response = session.post(creds["url_login"], json=payload, timeout=8)
+            
+        elif creds["tipo"] == "oauth_payload":
+            # CORREÇÃO FRONIUS: Injeta o grant_type solicitado pelo servidor de autenticação no print
+            headers_oauth = {"Content-Type": "application/x-www-form-urlencoded"}
+            payload = {
+                "grant_type": "password",
+                "username": creds["user"],
+                "password": creds["pass"],
+                "scope": "openid"
+            }
+            response = session.post(creds["url_login"], data=payload, headers=headers_oauth, timeout=8)
+            
+        else: # form_payload (Growatt e ShineMonitor)
+            payload = {"userName": creds["user"], "password": creds["pass"]}
             response = session.post(creds["url_login"], data=payload, timeout=8)
 
         codigo_http = response.status_code
         resposta_texto = response.text.strip()
 
-        # Armazena os dados brutos de retorno (JSON ou HTML cru) na tabela de auditoria
         st.session_state.historico_api[canal_alvo] = {
             "status_http": str(codigo_http),
-            "dados_brutos": resposta_texto if resposta_texto else "Sessão Inicializada (Vazio)",
-            "status": "🟢 ONLINE (LIVE)" if codigo_http == 200 else "🔴 RESPOSTA INVÁLIDA",
+            "dados_brutos": resposta_texto if resposta_texto else "Conexão Estabelecida com Sucesso",
+            "status": "🟢 ONLINE (LIVE)" if codigo_http in [200, 201] else "🔴 RESPOSTA REJEITADA",
             "timestamp": datetime.now().strftime("%H:%M:%S")
         }
 
     except Exception as err:
         st.session_state.historico_api[canal_alvo] = {
             "status_http": "TIMEOUT / ERR",
-            "dados_brutos": f"Erro de conexão com o endpoint: {str(err)}",
+            "dados_brutos": str(err),
             "status": "🔴 FALHA DE REDE",
             "timestamp": datetime.now().strftime("%H:%M:%S")
         }
 
-    # Avança a fila perpétua circular de forma imediata
     st.session_state.current_api_index = (idx_atual + 1) % len(lista_canais)
     time.sleep(intervalo_loop)
     st.rerun()
