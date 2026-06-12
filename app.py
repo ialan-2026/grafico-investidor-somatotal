@@ -2,39 +2,20 @@ import streamlit as st
 import requests
 import time
 import html
+import json
 from datetime import datetime
 
 st.set_page_config(page_title="API Telemetria Solar", layout="wide")
 
+# Mantemos a estrutura global, mas calibramos o motor interno da Growatt
 DADOS_CONEXAO = {
-    "Canal 01 (Solarman/Deye)": {
-        "url_login": "https://api.solarmanpv.com/account-api/v1.0/user/login", 
-        "user": "solaralbano@gmail.com", "pass": "mBA4rvnSMuc5", "tipo": "json_payload"
-    },
-    "Canal 02 (ShineMonitor)": {
-        "url_login": "https://www.shinemonitor.com/index_en.html", 
-        "user": "Albano Solar", "pass": "oNa17112#", "tipo": "form_payload"
-    },
-    "Canal 03 (Hopewind)": {
-        "url_login": "https://hopewindcloud.eu/api/v1/auth/login", 
-        "user": "solaralbano@gmail.com", "pass": "oNa17112", "tipo": "json_payload"
-    },
-    "Canal 04 (Growatt)": {
-        "url_login": "https://server.growatt.com/login.do", 
-        "user": "EBBJQA001", "pass": "Solarjob123", "tipo": "growatt_payload"
-    },
-    "Canal 05 (Hoymiles)": {
-        "url_login": "https://global.hoymiles.com/iam/api/login", 
-        "user": "solarjob", "pass": "Solarjob@123", "tipo": "hoymiles_payload"
-    },
-    "Canal 06 (FoxESS)": {
-        "url_login": "https://www.foxesscloud.com/v2/api/login", 
-        "user": "solarjob", "pass": "Solarjob@123", "tipo": "json_payload"
-    },
-    "Canal 07 (Fronius)": {
-        "url_login": "https://login.fronius.com/oauth2/token", 
-        "user": "engenharia@solarjob.com.br", "pass": "Solarjob@1234", "tipo": "oauth_payload"
-    }
+    "Canal 01 (Solarman/Deye)": {"url_login": "https://api.solarmanpv.com/account-api/v1.0/user/login", "user": "solaralbano@gmail.com", "pass": "mBA4rvnSMuc5", "tipo": "json_payload"},
+    "Canal 02 (ShineMonitor)": {"url_login": "https://www.shinemonitor.com/index_en.html", "user": "Albano Solar", "pass": "oNa17112#", "tipo": "form_payload"},
+    "Canal 03 (Hopewind)": {"url_login": "https://hopewindcloud.eu/api/v1/auth/login", "user": "solaralbano@gmail.com", "pass": "oNa17112", "tipo": "json_payload"},
+    "Canal 04 (Growatt)": {"url_login": "https://server.growatt.com/login.do", "user": "EBBJQA001", "pass": "Solarjob123", "tipo": "growatt_api"},
+    "Canal 05 (Hoymiles)": {"url_login": "https://global.hoymiles.com/iam/api/login", "user": "solarjob", "pass": "Solarjob@123", "tipo": "hoymiles_payload"},
+    "Canal 06 (FoxESS)": {"url_login": "https://www.foxesscloud.com/v2/api/login", "user": "solarjob", "pass": "Solarjob@123", "tipo": "json_payload"},
+    "Canal 07 (Fronius)": {"url_login": "https://login.fronius.com/oauth2/token", "user": "engenharia@solarjob.com.br", "pass": "Solarjob@1234", "tipo": "oauth_payload"}
 }
 
 st.markdown("""
@@ -49,11 +30,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ LAB DE TELEMETRIA SOLAR v2.3 (API SHIELDED)")
+st.title("⚡ LAB DE TELEMETRIA SOLAR v2.4 (LIVE DATA EXTRACTOR)")
 st.markdown("---")
 
 if "historico_api" not in st.session_state:
-    st.session_state.historico_api = {k: {"status_http": "-", "dados_brutos": "Aguardando Inicialização", "status": "Aguardando Inicialização", "timestamp": "-"} for k in DADOS_CONEXAO.keys()}
+    st.session_state.historico_api = {k: {"potencia": "- W", "diaria": "- kWh", "total": "- MWh", "status": "Aguardando Inicialização", "timestamp": "-"} for k in DADOS_CONEXAO.keys()}
 
 if "current_api_index" not in st.session_state:
     st.session_state.current_api_index = 0
@@ -62,7 +43,7 @@ col1, col2 = st.columns([1, 2])
 
 with col1:
     st.subheader("⚙️ Parâmetros de Chamada")
-    intervalo_loop = st.slider("Espera de Varredura entre Canais (segundos)", 1, 10, 5)
+    intervalo_loop = st.slider("Espera de Varredura entre Canais (segundos)", 1, 10, 4)
     loop_ativo = st.toggle("Ativar Varredura Cíclica Perpétua via API", value=False)
 
 with col2:
@@ -71,9 +52,10 @@ with col2:
     html_tabela = """<table class="status-table">
         <tr>
             <th>IDENTIFICAÇÃO CANAL</th>
-            <th>CÓDIGO HTTP</th>
+            <th>POTÊNCIA LIVE</th>
+            <th>GERAÇÃO DIÁRIA</th>
+            <th>GERAÇÃO TOTAL</th>
             <th>STATUS CONEXÃO</th>
-            <th>ÚLTIMO REGISTRO DE DADOS DA SESSÃO</th>
             <th>SINCRO</th>
         </tr>"""
     
@@ -82,14 +64,12 @@ with col2:
         elif "FALHA" in dados["status"]: cor_status = "badge-err"
         else: cor_status = "badge-process"
         
-        # 🛡️ ESCAPE DE SEGURANÇA: Neutraliza qualquer código HTML/XML que venha da resposta de erro do servidor
-        texto_seguro = html.escape(str(dados['dados_brutos']))
-        
         html_tabela += f"""<tr>
             <td><b>{canal}</b></td>
-            <td><code>{dados['status_http']}</code></td>
+            <td><code>{dados['potencia']}</code></td>
+            <td><code>{dados['diaria']}</code></td>
+            <td><code>{dados['total']}</code></td>
             <td class="{cor_status}">{dados['status']}</td>
-            <td><div style='max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'><code>{texto_seguro}</code></div></td>
             <td>{dados['timestamp']}</td>
         </tr>"""
     html_tabela += "</table>"
@@ -107,61 +87,67 @@ if loop_ativo:
     canal_alvo = lista_canais[idx_atual]
     creds = DADOS_CONEXAO[canal_alvo]
     
-    st.session_state.historico_api[canal_alvo]["status"] = "📡 REQUISITANDO ENDPOINT..."
-    console_placeholder.info(f"🔄 Disparando Requisição HTTP de Segundo Plano: {canal_alvo}...")
+    st.session_state.historico_api[canal_alvo]["status"] = "📡 AUTENTICANDO APP..."
+    console_placeholder.info(f"🔄 Conectando via API de Segundo Plano: {canal_alvo}...")
     
     session = requests.Session()
-    
-    headers_padrao = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
         "Accept": "application/json, text/plain, */*"
-    }
-    session.headers.update(headers_padrao)
+    })
 
     try:
-        if creds["tipo"] == "json_payload":
-            payload = {"username": creds["user"], "password": creds["pass"]}
-            response = session.post(creds["url_login"], json=payload, timeout=8)
+        # ==============================================================================
+        # MOTOR EXCLUSIVO: IMPLEMENTAÇÃO DO CRACHÁ DIGITAL GROWATT
+        # ==============================================================================
+        if creds["tipo"] == "growatt_api":
+            # Passo 1: Envia o batedor de login para obter o Cookie de Sessão corporativo
+            payload_login = {"account": creds["user"], "password": creds["pass"], "validateCode": ""}
+            response_login = session.post(creds["url_login"], data=payload_login, timeout=8)
             
-        elif creds["tipo"] == "hoymiles_payload":
-            payload = {"user_name": creds["user"], "password": creds["pass"], "language": "en_US"}
-            response = session.post(creds["url_login"], json=payload, timeout=8)
-            
-        elif creds["tipo"] == "growatt_payload":
-            payload = {"account": creds["user"], "password": creds["pass"], "validateCode": ""}
-            response = session.post(creds["url_login"], data=payload, timeout=8)
-            
-        elif creds["tipo"] == "oauth_payload":
-            headers_oauth = {"Content-Type": "application/x-www-form-urlencoded"}
-            payload = {
-                "grant_type": "password",
-                "username": creds["user"],
-                "password": creds["pass"]
-            }
-            response = session.post(creds["url_login"], data=payload, headers=headers_oauth, timeout=8)
-            
+            # Passo 2: Se o login passou, usa a mesma sessão para colher a árvore de dados puros
+            if response_login.status_code == 200:
+                url_dados = "https://server.growatt.com/NewPlantAPI.do?action=getCenterEnergyData"
+                response_dados = session.get(url_dados, timeout=8)
+                
+                try:
+                    dados_json = response_dados.json()
+                    # Garimpa os valores exatos de dentro do mapa de memória do servidor
+                    pot = dados_json.get("power", "0") + " W"
+                    dia = dados_json.get("todayEnergy", "0") + " kWh"
+                    tot = dados_json.get("totalEnergy", "0") + " MWh"
+                    status_txt = "🟢 ONLINE (LIVE)"
+                except:
+                    # Fallback de segurança caso o formato JSON varie
+                    pot, dia, tot = "- W", "- kWh", "- MWh"
+                    status_txt = "🔴 ERRO NO PARSER JSON"
+            else:
+                pot, dia, tot = "- W", "- kWh", "- MWh"
+                status_txt = "🔴 LOGIN REJEITADO"
+
+        # ==============================================================================
+        # CANAIS ADICIONAIS (EM ESTÁGIO DE MAPEAMENTO PROGRESSIVO)
+        # ==============================================================================
         else:
-            payload = {"username": creds["user"], "password": creds["pass"]}
-            response = session.post(creds["url_login"], data=payload, timeout=8)
+            # Mantém as outras conexões batendo o ponto no servidor para auditoria de portas
+            if creds["tipo"] == "json_payload":
+                session.post(creds["url_login"], json={"username": creds["user"], "password": creds["pass"]}, timeout=5)
+            elif creds["tipo"] == "hoymiles_payload":
+                session.post(creds["url_login"], json={"user_name": creds["user"], "password": creds["pass"], "language": "en_US"}, timeout=5)
+            
+            pot, dia, tot = "Staging", "Staging", "Staging"
+            status_txt = "🟠 AGUARDANDO REVERSÃO"
 
-        codigo_http = response.status_code
-        resposta_texto = response.text.strip()
-
-        status_real = "🟢 ONLINE (LIVE)" if codigo_http in [200, 201] and "html" not in response.headers.get("Content-Type", "") else "🔴 ENDPOINT RETIDO"
-
+        # Consolida os dados na interface gráfica
         st.session_state.historico_api[canal_alvo] = {
-            "status_http": str(codigo_http),
-            "dados_brutos": resposta_texto if resposta_texto else "Resposta de Sessão Ativa Vazia",
-            "status": status_real,
-            "timestamp": datetime.now().strftime("%H:%M:%S")
+            "potencia": pot, "diaria": dia, "total": tot,
+            "status": status_txt, "timestamp": datetime.now().strftime("%H:%M:%S")
         }
 
     except Exception as err:
         st.session_state.historico_api[canal_alvo] = {
-            "status_http": "TIMEOUT / ERR",
-            "dados_brutos": str(err),
-            "status": "🔴 FALHA DE REDE",
-            "timestamp": datetime.now().strftime("%H:%M:%S")
+            "potencia": "- W", "diaria": "- kWh", "total": "- MWh",
+            "status": "🔴 FALHA DE REDE", "timestamp": datetime.now().strftime("%H:%M:%S")
         }
 
     st.session_state.current_api_index = (idx_atual + 1) % len(lista_canais)
