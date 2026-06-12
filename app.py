@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import time
+import html
 from datetime import datetime
 
 st.set_page_config(page_title="API Telemetria Solar", layout="wide")
@@ -19,7 +20,7 @@ DADOS_CONEXAO = {
         "user": "solaralbano@gmail.com", "pass": "oNa17112", "tipo": "json_payload"
     },
     "Canal 04 (Growatt)": {
-        "url_login": "https://server.growatt.com/login.do", # Endpoint de produção corrigido
+        "url_login": "https://server.growatt.com/login.do", 
         "user": "EBBJQA001", "pass": "Solarjob123", "tipo": "growatt_payload"
     },
     "Canal 05 (Hoymiles)": {
@@ -48,11 +49,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ LAB DE TELEMETRIA SOLAR v2.2 (API CALIBRATION)")
+st.title("⚡ LAB DE TELEMETRIA SOLAR v2.3 (API SHIELDED)")
 st.markdown("---")
 
 if "historico_api" not in st.session_state:
-    st.session_state.historico_api = {k: {"status_http": "-", "dados_brutos": "Nenhum dado recebido", "status": "Aguardando Inicialização", "timestamp": "-"} for k in DADOS_CONEXAO.keys()}
+    st.session_state.historico_api = {k: {"status_http": "-", "dados_brutos": "Aguardando Inicialização", "status": "Aguardando Inicialização", "timestamp": "-"} for k in DADOS_CONEXAO.keys()}
 
 if "current_api_index" not in st.session_state:
     st.session_state.current_api_index = 0
@@ -77,13 +78,18 @@ with col2:
         </tr>"""
     
     for canal, dados in st.session_state.historico_api.items():
-        cor_status = "badge-ok" if "ONLINE" in dados["status"] else ("badge-err" if "FALHA" in dados["status"] else "badge-process")
+        if "ONLINE" in dados["status"]: cor_status = "badge-ok"
+        elif "FALHA" in dados["status"]: cor_status = "badge-err"
+        else: cor_status = "badge-process"
+        
+        # 🛡️ ESCAPE DE SEGURANÇA: Neutraliza qualquer código HTML/XML que venha da resposta de erro do servidor
+        texto_seguro = html.escape(str(dados['dados_brutos']))
         
         html_tabela += f"""<tr>
             <td><b>{canal}</b></td>
             <td><code>{dados['status_http']}</code></td>
             <td class="{cor_status}">{dados['status']}</td>
-            <td><div style='max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'><code>{dados['dados_brutos']}</code></div></td>
+            <td><div style='max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'><code>{texto_seguro}</code></div></td>
             <td>{dados['timestamp']}</td>
         </tr>"""
     html_tabela += "</table>"
@@ -122,12 +128,10 @@ if loop_ativo:
             response = session.post(creds["url_login"], json=payload, timeout=8)
             
         elif creds["tipo"] == "growatt_payload":
-            # CORREÇÃO GROWATT: Mapeado os parametros exatos esperados pelo server corporativo
             payload = {"account": creds["user"], "password": creds["pass"], "validateCode": ""}
             response = session.post(creds["url_login"], data=payload, timeout=8)
             
         elif creds["tipo"] == "oauth_payload":
-            # CORREÇÃO OAUTH: Enviando o grant_type no corpo do form urlencoded conforme solicitado
             headers_oauth = {"Content-Type": "application/x-www-form-urlencoded"}
             payload = {
                 "grant_type": "password",
@@ -136,14 +140,13 @@ if loop_ativo:
             }
             response = session.post(creds["url_login"], data=payload, headers=headers_oauth, timeout=8)
             
-        else: # form_payload standard
+        else:
             payload = {"username": creds["user"], "password": creds["pass"]}
             response = session.post(creds["url_login"], data=payload, timeout=8)
 
         codigo_http = response.status_code
         resposta_texto = response.text.strip()
 
-        # Validador estrito contra falsos positivos de páginas de login HTML
         status_real = "🟢 ONLINE (LIVE)" if codigo_http in [200, 201] and "html" not in response.headers.get("Content-Type", "") else "🔴 ENDPOINT RETIDO"
 
         st.session_state.historico_api[canal_alvo] = {
