@@ -29,10 +29,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ LAB DE TELEMETRIA SOLAR v2.4 (LIVE DATA EXTRACTOR)")
+st.title("⚡ LAB DE TELEMETRIA SOLAR v2.5 (DIAGNOSTIC ENGINE)")
 st.markdown("---")
 
-# 🛡️ PROTEÇÃO: Se a memória não existir OU for do modelo antigo, força o reset completo da estrutura
 if "historico_api" not in st.session_state or any("potencia" not in v for v in st.session_state.historico_api.values()):
     st.session_state.historico_api = {k: {"potencia": "- W", "diaria": "- kWh", "total": "- MWh", "status": "Aguardando Inicialização", "timestamp": "-"} for k in DADOS_CONEXAO.keys()}
 
@@ -41,7 +40,6 @@ if "current_api_index" not in st.session_state:
 
 lista_canais = list(DADOS_CONEXAO.keys())
 
-# Anti-Overstep de array
 if st.session_state.current_api_index >= len(lista_canais) or st.session_state.current_api_index < 0:
     st.session_state.current_api_index = 0
 
@@ -68,10 +66,9 @@ with col2:
     for canal, dados in st.session_state.historico_api.items():
         status_txt = dados.get("status", "Aguardando")
         if "ONLINE" in status_txt: cor_status = "badge-ok"
-        elif "FALHA" in status_txt: cor_status = "badge-err"
+        elif "FALHA" in status_txt or "ERRO" in status_txt: cor_status = "badge-err"
         else: cor_status = "badge-process"
         
-        # 🛡️ PROTEÇÃO COM .get(): Se a chave não existir na memória por delay, ele põe um "-" em vez de quebrar a tela
         html_tabela += f"""<tr>
             <td><b>{canal}</b></td>
             <td><code>{dados.get('potencia', '- W')}</code></td>
@@ -85,18 +82,17 @@ with col2:
 
     console_placeholder = st.empty()
 
-# --- ENGINE PRINCIPAL DA FILA CIRCULAR VIA REQUISITOS ---
 if loop_ativo:
     idx_atual = st.session_state.current_api_index
     canal_alvo = lista_canais[idx_atual]
     creds = DADOS_CONEXAO[canal_alvo]
     
-    st.session_state.historico_api[canal_alvo]["status"] = "📡 AUTENTICANDO APP..."
+    st.session_state.historico_api[canal_alvo]["status"] = "📡 PROCESSANDO..."
     console_placeholder.info(f"🔄 Conectando via API de Segundo Plano: {canal_alvo}...")
     
     session = requests.Session()
     session.headers.update({
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*"
     })
 
@@ -106,21 +102,24 @@ if loop_ativo:
             response_login = session.post(creds["url_login"], data=payload_login, timeout=8)
             
             if response_login.status_code == 200:
+                # Modificado para a URL estrita de colheita de dados do cliente do app móvel
                 url_dados = "https://server.growatt.com/NewPlantAPI.do?action=getCenterEnergyData"
                 response_dados = session.get(url_dados, timeout=8)
                 
                 try:
                     dados_json = response_dados.json()
-                    pot = dados_json.get("power", "0") + " W"
-                    dia = dados_json.get("todayEnergy", "0") + " kWh"
-                    tot = dados_json.get("totalEnergy", "0") + " MWh"
+                    pot = str(dados_json.get("power", "0")) + " W"
+                    dia = str(dados_json.get("todayEnergy", "0")) + " kWh"
+                    tot = str(dados_json.get("totalEnergy", "0")) + " MWh"
                     status_txt = "🟢 ONLINE (LIVE)"
                 except:
                     pot, dia, tot = "- W", "- kWh", "- MWh"
-                    status_txt = "🔴 ERRO NO PARSER JSON"
+                    # GRAMPO DE ENGENHARIA: Se não for JSON, exibe o começo do texto retornado para sabermos o motivo
+                    retorno_cru = response_dados.text.strip()[:35]
+                    status_txt = f"🔴 RESPOSTA: {html.escape(retorno_cru)}"
             else:
                 pot, dia, tot = "- W", "- kWh", "- MWh"
-                status_txt = "🔴 LOGIN REJEITADO"
+                status_txt = f"🔴 FALHA LOGIN ({response_login.status_code})"
 
         else:
             if creds["tipo"] == "json_payload":
@@ -139,7 +138,7 @@ if loop_ativo:
     except Exception as err:
         st.session_state.historico_api[canal_alvo] = {
             "potencia": "- W", "diaria": "- kWh", "total": "- MWh",
-            "status": "🔴 FALHA DE REDE", "timestamp": datetime.now().strftime("%H:%M:%S")
+            "status": "🔴 FALHA DE CONEXÃO", "timestamp": datetime.now().strftime("%H:%M:%S")
         }
 
     st.session_state.current_api_index = (idx_atual + 1) % len(lista_canais)
