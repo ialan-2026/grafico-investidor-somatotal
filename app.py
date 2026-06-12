@@ -8,13 +8,7 @@ from datetime import datetime
 st.set_page_config(page_title="API Telemetria Solar", layout="wide")
 
 DADOS_CONEXAO = {
-    "Canal 01 (Solarman/Deye)": {"url_login": "https://api.solarmanpv.com/account-api/v1.0/user/login", "user": "solaralbano@gmail.com", "pass": "mBA4rvnSMuc5", "tipo": "json_payload"},
-    "Canal 02 (ShineMonitor)": {"url_login": "https://www.shinemonitor.com/index_en.html", "user": "Albano Solar", "pass": "oNa17112#", "tipo": "form_payload"},
-    "Canal 03 (Hopewind)": {"url_login": "https://hopewindcloud.eu/api/v1/auth/login", "user": "solaralbano@gmail.com", "pass": "oNa17112", "tipo": "json_payload"},
-    "Canal 04 (Growatt)": {"url_login": "https://server.growatt.com/login.do", "user": "EBBJQA001", "pass": "Solarjob123", "tipo": "growatt_api"},
-    "Canal 05 (Hoymiles)": {"url_login": "https://global.hoymiles.com/iam/api/login", "user": "solarjob", "pass": "Solarjob@123", "tipo": "hoymiles_payload"},
-    "Canal 06 (FoxESS)": {"url_login": "https://www.foxesscloud.com/v2/api/login", "user": "solarjob", "pass": "Solarjob@123", "tipo": "json_payload"},
-    "Canal 07 (Fronius)": {"url_login": "https://login.fronius.com/oauth2/token", "user": "engenharia@solarjob.com.br", "pass": "Solarjob@1234", "tipo": "oauth_payload"}
+   
 }
 
 st.markdown("""
