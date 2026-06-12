@@ -17,7 +17,7 @@ DADOS_CONEXAO = {
     "Canal 05 (Hoymiles)": {"url": "https://global.hoymiles.com/website", "user": "solarjob", "pass": "Solarjob@123", "tipo": "hoymiles"},
     "Canal 06 (FoxESS)": {"url": "https://www.foxesscloud.com/v2/login", "user": "solarjob", "pass": "Solarjob@123", "tipo": "foxess"} 
   }
-}
+
 
 st.markdown("""
     <style>
