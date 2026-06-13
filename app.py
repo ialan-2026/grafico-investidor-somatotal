@@ -202,5 +202,5 @@ df_auditoria = pd.DataFrame({
 st.dataframe(df_auditoria, use_container_width=True, hide_index=True)
 
 # Loop perpétuo reativo de 1 segundo
-time.sleep(1)
+time.sleep(300)
 st.rerun()
