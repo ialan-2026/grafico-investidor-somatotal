@@ -105,7 +105,7 @@ html_quadro_central = """<table class="status-table">
     <tr>
         <th>IDENTIFICAÇÃO CANAL / ATIVO</th>
         <th>POTÊNCIA LIVE</th>
-        <th>GERAÇÃO INSTANTÂNEA (HOJE)</th>
+        <th>GERAÇÃO INSTANTÂNEA </th>
         <th>GERAÇÃO TOTAL ACUMULADA</th>
         <th>STATUS CONEXÃO</th>
         <th>SINCRO LIVE</th>
