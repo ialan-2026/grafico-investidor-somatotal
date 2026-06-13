@@ -94,11 +94,11 @@ st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("""<div class="panel-title-bar">🌐 GESTÃO OPERACIONAL DE CRÉDITO DE ENERGIA LIMPA</div>""", unsafe_allow_html=True)
 
 distribuicao_usinas = [
-    {"nome": "Usina Solar Alvorada Premium", "peso": 0.28, "historico": 452.1},
-    {"nome": "Usina Fotovoltaica Rio Claro", "peso": 0.22, "historico": 341.8},
-    {"nome": "Complexo Solar Novo Horizonte", "peso": 0.18, "historico": 295.4},
-    {"nome": "Parque Solar Guarani Ativos", "peso": 0.17, "historico": 268.2},
-    {"nome": "Central Energética Serra do Mel", "peso": 0.15, "historico": 242.9}
+    {"nome": "Usina Sitio Castelinho", "peso": 0.28, "historico": 452.1},
+    {"nome": "Usina Sr Quitandeiro Horti-Fruti", "peso": 0.22, "historico": 341.8},
+    {"nome": "Usina Fazenda Boa Vista", "peso": 0.18, "historico": 295.4},
+    {"nome": "Usina Fazenda Vila Real", "peso": 0.17, "historico": 268.2},
+    {"nome": "Usina Jose Eduardo Sorares", "peso": 0.15, "historico": 242.9}
 ]
 
 html_quadro_central = """<table class="status-table">
