@@ -82,7 +82,7 @@ col_c1, col_c2, col_c3 = st.columns(3)
 with col_c1:
     render_metric_card("⚡ POTÊNCIA INSTANTÂNEA COMBINADA", f"{potencia_live_kw:.2f} kW", f"Rendimentos Live: R$ {(potencia_live_kw * VALOR_KWH)/60:.2f}/min", "neon-green")
 with col_c2:
-    render_metric_card("📅 RENDIMENTO DIÁRIO (HOJE)", f"R$ {faturamento_hoje_total:,.2f}", f"Injeção: {energia_hoje_kwh:,.1f} kWh", "neon-blue")
+    render_metric_card("📅 RENDIMENTO INSTANTÂNEO", f"R$ {faturamento_hoje_total:,.2f}", f"Injeção: {energia_hoje_kwh:,.1f} kWh", "neon-blue")
 with col_c3:
     render_metric_card("🏛️ PATRIMÔNIO CONSOLIDADO 2026", f"R$ {faturamento_anual_2026_realizado:,.2f}", f"Geração Total: {energia_anual_mwh_realizado:,.2f} MWh", "neon-orange")
 
